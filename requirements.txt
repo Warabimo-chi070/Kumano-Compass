@@ -1,8 +1,11 @@
 fastapi
 uvicorn[standard]
+<<<<<<< HEAD
 python-dotenv
 requests
 supabase
 openai
 SudachiPy
 sudachidict_core
+=======
+>>>>>>> 7605ea8 (2)
