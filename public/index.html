@@ -1,0 +1,1773 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>Kumano Compass - Voice Input</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-soft: #e3f2fd;
+      --primary-gradient: linear-gradient(135deg, #2563eb, #4f46e5);
+      --accent: #00bfa5;
+      --danger: #e53935;
+      --bg: #f5f7fb;
+      --card-bg: #ffffff;
+      --text-main: #222b45;
+      --text-sub: #6b7280;
+      --border-soft: #e5e7eb;
+      --radius-lg: 18px;
+      --radius-md: 12px;
+      --radius-full: 999px;
+      --shadow-soft: 0 12px 30px rgba(15, 23, 42, 0.08);
+      --transition-fast: 0.18s ease-out;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top, #e0ecff 0, #f6f7fb 40%, #f3f6fb 100%);
+      color: var(--text-main);
+    }
+
+    /* レイアウト切替ラッパー */
+
+    .layout-desktop,
+    .layout-mobile {
+      width: 100%;
+    }
+
+    .layout-desktop {
+      display: block;
+    }
+
+    .layout-mobile {
+      display: none;
+    }
+
+    @media (max-width: 768px) {
+      .layout-desktop {
+        display: none;
+      }
+      .layout-mobile {
+        display: block;
+      }
+    }
+
+    /* ==== PC版スタイル（元 index.html） ==== */
+
+    .app-shell {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 32px 16px;
+    }
+
+    .app-header {
+      width: 100%;
+      max-width: 960px;
+      margin-bottom: 24px;
+    }
+
+    .app-title {
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .app-pill {
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: #e0f2fe;
+      color: #0369a1;
+      font-weight: 600;
+    }
+
+    .app-subtitle {
+      margin-top: 6px;
+      font-size: 13px;
+      color: var(--text-sub);
+    }
+
+    .card {
+      width: 100%;
+      max-width: 960px;
+      background: var(--card-bg);
+      border-radius: 24px;
+      box-shadow: var(--shadow-soft);
+      padding: 24px 24px 20px;
+      display: grid;
+      grid-template-columns: 1.1fr 1.6fr;
+      gap: 24px;
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.18s ease, box-shadow 0.25s ease;
+    }
+
+    .card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.14);
+    }
+
+    .card-left {
+      border-right: 1px solid #e5e7eb;
+      padding-right: 20px;
+    }
+
+    .field-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-sub);
+      margin-bottom: 6px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .field-group {
+      margin-bottom: 16px;
+    }
+
+    .select-row {
+      display: flex;
+      gap: 10px;
+    }
+
+    select {
+      width: 100%;
+      padding: 8px 10px;
+      border-radius: 999px;
+      border: 1px solid #d4d4d8;
+      background: #f9fafb;
+      font-size: 13px;
+      outline: none;
+      transition: border-color var(--transition-fast),
+        box-shadow var(--transition-fast), background var(--transition-fast),
+        transform 0.16s ease;
+    }
+
+    select:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+      background: #ffffff;
+      transform: translateY(-1px);
+    }
+
+    .button-row {
+      display: flex;
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    button {
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    .btn {
+      border-radius: 999px;
+      padding: 10px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: background var(--transition-fast),
+        transform var(--transition-fast), box-shadow var(--transition-fast),
+        opacity var(--transition-fast);
+      white-space: nowrap;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #0052cc, #0084ff);
+      color: #ffffff;
+      box-shadow: 0 10px 20px rgba(37, 99, 235, 0.28);
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 16px 30px rgba(37, 99, 235, 0.35);
+    }
+
+    .btn-primary:active:not(:disabled) {
+      transform: translateY(0);
+      box-shadow: 0 6px 16px rgba(37, 99, 235, 0.3);
+    }
+
+    .btn-outline {
+      background: #f3f4f6;
+      color: #111827;
+    }
+
+    .btn-outline:hover:not(:disabled) {
+      background: #e5e7eb;
+    }
+
+    .btn-danger {
+      background: #fee2e2;
+      color: #b91c1c;
+    }
+
+    .btn-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 999px;
+      background: #eff6ff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: default;
+      box-shadow: none;
+      transform: none;
+    }
+
+    .btn-loading {
+      position: relative;
+      padding-right: 30px;
+    }
+
+    .btn-loading::after {
+      content: "";
+      position: absolute;
+      right: 10px;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      border: 2px solid rgba(255, 255, 255, 0.7);
+      border-top-color: rgba(255, 255, 255, 0.1);
+      animation: spin 0.7s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .hint-text {
+      margin-top: 6px;
+      font-size: 11px;
+      color: var(--text-sub);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .hint-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      background: var(--accent);
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      background: #ecfdf5;
+      color: #15803d;
+      margin-top: 6px;
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: #22c55e;
+      box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.28);
+      animation: pulse 1.4s infinite;
+    }
+
+    @keyframes pulse {
+      0% {
+        transform: scale(0.95);
+        opacity: 0.9;
+      }
+      70% {
+        transform: scale(1.06);
+        opacity: 0.2;
+      }
+      100% {
+        transform: scale(0.95);
+        opacity: 0.9;
+      }
+    }
+
+    .card-right {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .textarea-wrapper {
+      position: relative;
+      flex: 1;
+    }
+
+    textarea {
+      width: 100%;
+      height: 170px;
+      resize: vertical;
+      padding: 12px 14px 32px;
+      border-radius: var(--radius-lg);
+      border: 1px solid #e5e7eb;
+      background: #f9fafb;
+      font-size: 13px;
+      line-height: 1.6;
+      outline: none;
+      transition: border-color var(--transition-fast),
+        box-shadow var(--transition-fast), background var(--transition-fast),
+        transform var(--transition-fast);
+    }
+
+    textarea:focus {
+      border-color: var(--primary);
+      background: #ffffff;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
+      transform: translateY(-1px);
+    }
+
+    .textarea-footer {
+      position: absolute;
+      bottom: 8px;
+      right: 10px;
+      font-size: 11px;
+      color: var(--text-sub);
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .chip {
+      padding: 3px 7px;
+      border-radius: 999px;
+      background: #eff6ff;
+      color: #1d4ed8;
+      font-size: 11px;
+    }
+
+    .toast-pc {
+      position: fixed;
+      right: 24px;
+      bottom: 24px;
+      background: #111827;
+      color: #f9fafb;
+      padding: 10px 14px;
+      border-radius: 999px;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.5);
+      opacity: 0;
+      transform: translateY(10px);
+      pointer-events: none;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+      z-index: 50;
+    }
+
+    .toast-pc.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .toast-pc.success {
+      background: #022c22;
+    }
+
+    .toast-pc.error {
+      background: #7f1d1d;
+    }
+
+    .toast-icon {
+      font-size: 16px;
+    }
+
+    @media (max-width: 840px) {
+      .card {
+        grid-template-columns: 1fr;
+        padding: 18px 16px;
+      }
+      .card-left {
+        border-right: none;
+        border-bottom: 1px solid #e5e7eb;
+        padding-right: 0;
+        padding-bottom: 16px;
+        margin-bottom: 10px;
+      }
+    }
+
+    /* ==== モバイル版スタイル（元 mobile.html） ==== */
+
+    .layout-mobile .app {
+      max-width: 480px;
+      margin: 0 auto;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: 12px 12px 24px;
+    }
+
+    .layout-mobile .app-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 6px 6px;
+    }
+
+    .layout-mobile .brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .layout-mobile .brand-dot {
+      width: 20px;
+      height: 20px;
+      border-radius: 10px;
+      background: radial-gradient(
+        circle at 30% 20%,
+        #ffffff 0,
+        #93c5fd 35%,
+        #2563eb 100%
+      );
+      box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.18);
+    }
+
+    .layout-mobile .brand-name {
+      display: none; 
+    }
+
+    .layout-mobile .brand-sub {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .layout-mobile .header-tag {
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(37, 99, 235, 0.08);
+      color: #1d4ed8;
+      border: 1px solid rgba(37, 99, 235, 0.18);
+      backdrop-filter: blur(8px);
+    }
+
+    .layout-mobile .app-main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 4px;
+    }
+
+    .layout-mobile .card {
+      background: var(--card-bg);
+      border-radius: 22px;
+      padding: 14px 14px 16px;
+      box-shadow: 0 20px 40px rgba(15, 23, 42, 0.08);
+      border: 1px solid rgba(148, 163, 184, 0.12);
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.16s ease, box-shadow 0.24s ease;
+    }
+
+    .layout-mobile .card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(
+        circle at top right,
+        rgba(59, 130, 246, 0.06),
+        transparent 60%
+      );
+      pointer-events: none;
+    }
+
+    .layout-mobile .card:active {
+      transform: translateY(1px);
+      box-shadow: 0 10px 22px rgba(15, 23, 42, 0.12);
+    }
+
+    .layout-mobile .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+
+    .layout-mobile .card-title {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #6b7280;
+    }
+
+    .layout-mobile .card-caption {
+      font-size: 11px;
+      color: var(--text-sub);
+    }
+
+    .layout-mobile .field-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 6px;
+    }
+
+    .layout-mobile .field {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .layout-mobile .field-label {
+      font-size: 11px;
+      color: var(--text-sub);
+    }
+
+    .layout-mobile .select-wrapper {
+      position: relative;
+      border-radius: var(--radius-full);
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      padding: 6px 12px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .layout-mobile .select-wrapper::after {
+      content: "▾";
+      font-size: 10px;
+      color: #9ca3af;
+      margin-left: auto;
+    }
+
+    .layout-mobile select {
+      border: none;
+      background: transparent;
+      font-size: 13px;
+      width: 100%;
+      outline: none;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+
+    .layout-mobile .status-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 12px;
+      font-size: 11px;
+    }
+
+    .layout-mobile .chip {
+      padding: 4px 9px;
+      border-radius: 999px;
+      border: 1px solid #e5e7eb;
+      background: #f9fafb;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      color: var(--text-sub);
+    }
+
+    .layout-mobile .chip-success {
+      background: #ecfdf3;
+      border-color: #bbf7d0;
+      color: #15803d;
+    }
+
+    .layout-mobile .chip-error {
+      background: #fef2f2;
+      border-color: #fecaca;
+      color: #b91c1c;
+    }
+
+    .layout-mobile .textarea-wrapper {
+      margin-top: 4px;
+      border-radius: 18px;
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      padding: 8px 10px 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .layout-mobile textarea {
+      width: 100%;
+      border: none;
+      background: transparent;
+      resize: none;
+      min-height: 140px;
+      font-size: 14px;
+      line-height: 1.5;
+      outline: none;
+      color: var(--text-main);
+    }
+
+    .layout-mobile .textarea-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      color: var(--text-sub);
+      margin-top: 3px;
+    }
+
+    .layout-mobile .hint {
+      color: var(--text-sub);
+    }
+
+    .layout-mobile .char-count {
+      font-variant-numeric: tabular-nums;
+    }
+
+    .layout-mobile .button-row {
+      display: flex;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .layout-mobile .btn {
+      flex: 1;
+      border-radius: 999px;
+      border: none;
+      padding: 10px 14px;
+      font-size: 14px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      cursor: pointer;
+      transition: transform 0.08s ease, box-shadow 0.12s ease,
+        background 0.12s ease;
+      outline: none;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .layout-mobile .btn:disabled {
+      opacity: 0.65;
+      cursor: default;
+      box-shadow: none;
+    }
+
+    .layout-mobile .btn-primary {
+      background-image: var(--primary-gradient);
+      color: #ffffff;
+      box-shadow: 0 10px 25px rgba(37, 99, 235, 0.45);
+    }
+
+    .layout-mobile .btn-secondary {
+      background: #eef2ff;
+      color: #3730a3;
+      box-shadow: 0 6px 18px rgba(129, 140, 248, 0.35);
+    }
+
+    .layout-mobile .btn-pressed {
+      transform: translateY(1px) scale(0.97);
+      box-shadow: 0 4px 10px rgba(15, 23, 42, 0.16);
+    }
+
+    .layout-mobile .btn-icon-circle {
+      width: 26px;
+      height: 26px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.16);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+
+    .layout-mobile .btn-label {
+      white-space: nowrap;
+    }
+
+    .layout-mobile .btn-primary .spinner {
+      display: none;
+    }
+
+    .layout-mobile .btn-primary.loading .spinner {
+      display: inline-block;
+    }
+
+    .layout-mobile .btn-primary.loading .btn-label {
+      opacity: 0;
+    }
+
+    .spinner {
+      width: 16px;
+      height: 16px;
+      border-radius: 999px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-top-color: #ffffff;
+      animation: spin 0.7s linear infinite;
+    }
+
+    .layout-mobile .btn-secondary.recording {
+      background: #fee2e2;
+      color: #b91c1c;
+      box-shadow: 0 8px 18px rgba(248, 113, 113, 0.55);
+    }
+
+    .layout-mobile .pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: #ef4444;
+      box-shadow: 0 0 0 0 rgba(248, 113, 113, 0.6);
+      animation: pulse 1.3s infinite;
+    }
+
+    .toast-mobile {
+      position: fixed;
+      left: 50%;
+      bottom: 18px;
+      transform: translateX(-50%) translateY(120%);
+      background: #111827;
+      color: #f9fafb;
+      padding: 9px 14px;
+      border-radius: 999px;
+      font-size: 13px;
+      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.5);
+      opacity: 0;
+      transition: transform 0.22s ease, opacity 0.22s ease;
+      z-index: 40;
+      max-width: 90%;
+      text-align: center;
+    }
+
+    .toast-mobile.show {
+      transform: translateX(-50%) translateY(0%);
+      opacity: 1;
+    }
+
+    .toast-mobile.error {
+      background: #b91c1c;
+    }
+
+    @media (max-width: 360px) {
+      .layout-mobile .button-row {
+        flex-direction: column;
+      }
+    }
+
+    /* ==== Kumano Compass 共通ナビバー ==================== */
+    .kc-nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 64px;
+      z-index: 1000;
+      padding: 0 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at top left,
+                  rgba(226, 239, 255, 0.95),
+                  rgba(255, 255, 255, 0.98));
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      box-shadow: 0 14px 30px rgba(15, 23, 42, 0.10);
+      border-bottom: 1px solid rgba(209, 213, 219, 0.7);
+    }
+
+    .kc-nav-inner {
+      width: 100%;
+      max-width: 1120px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .kc-nav-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+      cursor: pointer;
+      padding: 6px 0;
+      border: none;
+      background: transparent;
+    }
+
+    .kc-nav-logo-dot {
+      width: 24px;
+      height: 24px;
+      border-radius: 999px;
+      background: radial-gradient(circle at 30% 20%, #ffffff 0, #93c5fd 35%, #2563eb 100%);
+      box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.22);
+      animation: kc-nav-breath 3.2s ease-in-out infinite;
+    }
+
+    .kc-nav-logo-text {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .kc-nav-title {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+    }
+
+    .kc-nav-sub {
+      font-size: 11px;
+      color: #6b7280;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .kc-nav-center {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .kc-nav-link {
+      position: relative;
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-size: 12px;
+      color: #4b5563;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid rgba(148, 163, 184, 0.7); /* ← 枠線つける */
+      background: rgba(255, 255, 255, 0.9);
+      cursor: pointer;
+      transition:
+        background 0.18s ease-out,
+        color 0.18s ease-out,
+        transform 0.18s ease-out,
+        border-color 0.18s ease-out;
+    }
+
+    .kc-nav-link::after {
+      content: "";
+      position: absolute;
+      left: 14px;
+      right: 14px;
+      bottom: 4px;
+      height: 2px;
+      border-radius: 999px;
+      background: rgba(37, 99, 235, 0.9);
+      transform: scaleX(0);
+      transform-origin: center;
+      transition: transform 0.2s ease-out;
+    }
+
+    .kc-nav-link:hover {
+      background: rgba(239, 246, 255, 0.95);
+      border-color: rgba(59, 130, 246, 0.9); /* ホバー時に枠を少し濃く */
+      transform: translateY(-1px);
+    }
+
+    .kc-nav-link:hover::after {
+      transform: scaleX(1);
+    }
+
+    .kc-nav-link.active {
+      background: rgba(219, 234, 254, 0.95);
+      color: #1d4ed8;
+      border-color: rgba(37, 99, 235, 1); /* アクティブはしっかり青枠 */
+    }
+
+    .kc-nav-link.active::after {
+      transform: scaleX(1);
+    }
+
+    .kc-nav-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .kc-nav-pill {
+      font-size: 10px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(148, 163, 184, 0.12);
+      color: #6b7280;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .kc-nav-pill-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #22c55e;
+      box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.35);
+    }
+
+    /* コンテンツ押し下げ用（index/adminで使う） */
+    .kc-nav-spacer {
+      height: 72px;
+    }
+
+    /* アニメーション */
+
+    @keyframes kc-nav-slide-in {
+      from {
+        transform: translateY(-100%);
+        opacity: 0;
+      }
+      to {
+        transform: translateY(0%);
+        opacity: 1;
+      }
+    }
+
+    @keyframes kc-nav-breath {
+      0% {
+        transform: scale(1);
+        box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.22);
+      }
+      50% {
+        transform: scale(1.06);
+        box-shadow: 0 0 0 8px rgba(37, 99, 235, 0.0);
+      }
+      100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.22);
+      }
+    }
+
+    /* === 共通メニューバー：スマホ用レイアウト（視認性重視） === */
+    @media (max-width: 768px) {
+      .kc-nav {
+        height: 70px;
+        padding: 6px 10px;
+      }
+
+      .kc-nav-inner {
+        align-items: center;
+        gap: 6px;
+      }
+
+      .kc-nav-left {
+        gap: 6px;
+      }
+
+      .kc-nav-logo-dot {
+        width: 22px;
+        height: 22px;
+      }
+
+      .kc-nav-title {
+        font-size: 13px;
+        letter-spacing: 0.03em;
+      }
+
+      /* 説明文はスマホでは非表示にしてナビをスッキリ */
+      .kc-nav-sub {
+        display: none;
+      }
+
+      /* 中央タブ：3つを均等幅の大きなボタンにする */
+      .kc-nav-center {
+        flex: 1;
+        justify-content: space-between;
+        gap: 4px;
+      }
+
+      .kc-nav-link {
+        flex: 1;                     /* 3つで横幅を等分 */
+        justify-content: center;
+        padding: 8px 4px;
+        font-size: 11px;
+      }
+
+      /* これまで隠していたラベルもスマホで表示して視認性UP */
+      .kc-nav-link span:last-child {
+        display: inline;
+      }
+
+      /* ステータスピル（オンライン／Supabase連携中）は隠す */
+      .kc-nav-right .kc-nav-pill {
+        display: none;
+      }
+
+      /* mapページなどのCTAボタンは小さめに残す */
+      .kc-nav-right .kc-nav-cta {
+        padding: 6px 10px;
+        font-size: 11px;
+      }
+
+      /* コンテンツの押し下げ量も少し増やす */
+      .kc-nav-spacer {
+        height: 78px;
+      }
+    }
+
+  </style>
+</head>
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const links = document.querySelectorAll(".kc-nav-link");
+    if (!links.length) return;
+
+    // 現在のパスを取得して末尾のスラッシュを削る（/admin/ → /admin）
+    const rawPath = window.location.pathname || "/";
+    const currentPath =
+      rawPath.length > 1 ? rawPath.replace(/\/+$/, "") : rawPath;
+
+    links.forEach((btn) => {
+      const href = btn.getAttribute("data-nav-href");
+      if (!href) return;
+
+      const hrefNorm =
+        href.length > 1 ? href.replace(/\/+$/, "") : href;
+
+      // 完全一致したときだけ active を付与
+      if (currentPath === hrefNorm) {
+        btn.classList.add("active");
+      }
+
+      btn.addEventListener("click", () => {
+        window.location.href = href;
+      });
+    });
+
+    // （モバイルメニューを後で入れたい場合用のフック）
+    const burger = document.querySelector(".kc-nav-burger");
+    const mobileMenu = document.querySelector(".kc-nav-mobile-menu");
+    if (burger && mobileMenu) {
+      burger.addEventListener("click", () => {
+        burger.classList.toggle("open");
+        mobileMenu.classList.toggle("open");
+      });
+
+      mobileMenu.querySelectorAll("[data-nav-href]").forEach((item) => {
+        item.addEventListener("click", () => {
+          const href = item.getAttribute("data-nav-href");
+          if (href) {
+            window.location.href = href;
+          }
+        });
+      });
+    }
+  });
+</script>
+<body>
+  <body>
+  <!-- 共通ナビバー -->
+  <div class="kc-nav">
+    <div class="kc-nav-inner">
+      <!-- 左ロゴ：入力画面トップに戻る -->
+      <button
+        class="kc-nav-left"
+        type="button"
+        onclick="window.location.href='/public/index.html'"
+      >
+        <div class="kc-nav-logo-dot"></div>
+        <div class="kc-nav-logo-text">
+          <div class="kc-nav-title">Kumano Compass</div>
+          <div class="kc-nav-sub">住民の声 · 入力コンソール</div>
+        </div>
+      </button>
+
+      <!-- 中央タブ -->
+      <div class="kc-nav-center">
+        <a href="/public/index.html" class="kc-nav-link active">
+          <span>📝</span><span>入力</span>
+        </a>
+        <a href="/admin" class="kc-nav-link">
+          <span>📊</span><span>一覧</span>
+        </a>
+        <a href="/admin/map" class="kc-nav-link">
+          <span>🗺</span><span>マップ</span>
+        </a>
+      </div>
+
+      <!-- 右側：ステータス表示 -->
+      <div class="kc-nav-right">
+        <div class="kc-nav-pill">
+          <span class="kc-nav-pill-dot"></span>
+          <span>現地入力モード</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ナビの高さ分だけ押し下げ -->
+  <div class="kc-nav-spacer"></div>
+
+  <!-- PCレイアウト -->
+  <div class="layout-desktop">
+    <div class="app-shell">
+      <header class="app-header">
+        <div class="app-title">
+          <span class="app-pill">PC入力コンソール</span>
+        </div>
+        <div class="app-subtitle">
+          現地で聞いた「生の声」を、その場で簡単に記録し AI 解析へ送信できます。
+        </div>
+      </header>
+
+      <main class="card">
+        <!-- 左カラム：設定・ボタン -->
+        <section class="card-left">
+          <div class="field-group">
+            <div class="field-label">AREA・SOURCE</div>
+            <div class="select-row">
+              <select id="area">
+                <option value="神川">神川</option>
+                <option value="木本">木本</option>
+                <option value="飛鳥">飛鳥</option>
+                <option value="市木">市木</option>
+                <option value="紀和">紀和</option>
+              </select>
+              <select id="source">
+                <option value="local">地域の方々</option>
+                <option value="ivusa">学生</option>
+                <option value="tourist">観光客</option>
+              </select>
+            </div>
+          </div>
+          <div class="field-group">
+            <div class="field-label">属性（任意）</div>
+            <div class="select-row">
+              <select id="age" aria-label="年齢">
+                <option value="">年齢（未選択）</option>
+                <option value="10代">10代</option>
+                <option value="20代">20代</option>
+                <option value="30代">30代</option>
+                <option value="40代">40代</option>
+                <option value="50代">50代</option>
+                <option value="60代">60代</option>
+                <option value="70代以上">70代以上</option>
+                <option value="不明">不明</option>
+              </select>
+
+              <select id="gender" aria-label="性別">
+                <option value="">性別（未選択）</option>
+                <option value="男性">男性</option>
+                <option value="女性">女性</option>
+                <option value="その他/回答しない">その他/回答しない</option>
+                <option value="不明">不明</option>
+              </select>
+            </div>
+
+            <div class="select-row" style="margin-top:10px;">
+              <select id="occupation" aria-label="職業">
+                <option value="">職業（未選択）</option>
+                <option value="会社員">会社員</option>
+                <option value="自営業">自営業</option>
+                <option value="公務員">公務員</option>
+                <option value="学生">学生</option>
+                <option value="主婦・主夫">主婦・主夫</option>
+                <option value="農林水産">農林水産</option>
+                <option value="観光業">観光業</option>
+                <option value="医療・福祉">医療・福祉</option>
+                <option value="教育">教育</option>
+                <option value="無職">無職</option>
+                <option value="その他">その他</option>
+                <option value="不明">不明</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field-group">
+            <div class="field-label">RECORDING</div>
+            <div class="button-row">
+              <button id="recordBtn" class="btn btn-outline" type="button">
+                <span class="btn-icon">🎤</span>
+                <span id="recordBtnLabel">音声入力を開始</span>
+              </button>
+              <button
+                id="sendBtn"
+                class="btn btn-primary"
+                type="button"
+                onclick="saveData()"
+              >
+                📩 AI解析して保存
+              </button>
+            </div>
+            <div class="hint-text">
+              <span class="hint-dot"></span>
+              ブラウザのマイク・位置情報の許可が必要です。
+            </div>
+            <div id="geoStatus" class="status-pill" style="display: none;">
+              <span class="status-dot"></span> 位置情報を取得しました
+            </div>
+          </div>
+        </section>
+
+        <!-- 右カラム：テキストエリア -->
+        <section class="card-right">
+          <div class="field-label">TRANSCRIPT</div>
+          <div class="textarea-wrapper">
+            <textarea
+              id="textOutput"
+              placeholder="ヒアリングした内容をそのまま入力するか、音声入力で記録してください。"
+            ></textarea>
+            <div class="textarea-footer">
+              <span id="charCount" class="chip">0 文字</span>
+              <span style="font-size: 11px; color: var(--text-sub);">
+                Enter で改行できます
+              </span>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <!-- PC用トースト -->
+    <div id="toast-pc" class="toast-pc">
+      <span id="toastIcon-pc" class="toast-icon">ℹ️</span>
+      <span id="toastMessage-pc"></span>
+    </div>
+  </div>
+
+  <!-- モバイルレイアウト -->
+  <div class="layout-mobile">
+    <div class="app">
+      <header class="app-header">
+          <span class="app-pill">モバイル入力コンソール</span>
+          <div class="app-subtitle">
+          「現地の声」をその場で記録し、AI解析へ送信できます。
+          </div>
+      </header>
+
+      <main class="app-main">
+        <!-- Card 1: Area & Source -->
+        <section class="card">
+          <div class="card-header">
+            <div class="card-title">AREA · SOURCE</div>
+            <div class="card-caption">どこで、誰の声かを選択してください</div>
+          </div>
+
+          <div class="field-row">
+            <div class="field">
+              <div class="field-label">地区</div>
+              <div class="select-wrapper">
+                <select id="area-mobile">
+                  <option value="神川">神川</option>
+                  <option value="木本">木本</option>
+                  <option value="飛鳥">飛鳥</option>
+                  <option value="市木">市木</option>
+                  <option value="紀和">紀和</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="field">
+              <div class="field-label">種類</div>
+              <div class="select-wrapper">
+                <select id="source-mobile">
+                  <option value="local">地域の方々</option>
+                  <option value="ivusa">学生</option>
+                  <option value="tourist">観光客の声</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="field-row">
+            <div class="field">
+              <div class="field-label">年齢（任意）</div>
+              <div class="select-wrapper">
+                <select id="age-mobile">
+                  <option value="">未選択</option>
+                  <option value="10代">10代</option>
+                  <option value="20代">20代</option>
+                  <option value="30代">30代</option>
+                  <option value="40代">40代</option>
+                  <option value="50代">50代</option>
+                  <option value="60代">60代</option>
+                  <option value="70代以上">70代以上</option>
+                  <option value="不明">不明</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="field">
+              <div class="field-label">性別（任意）</div>
+              <div class="select-wrapper">
+                <select id="gender-mobile">
+                  <option value="">未選択</option>
+                  <option value="男性">男性</option>
+                  <option value="女性">女性</option>
+                  <option value="その他/回答しない">その他/回答しない</option>
+                  <option value="不明">不明</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="field-row">
+            <div class="field">
+              <div class="field-label">職業（任意）</div>
+              <div class="select-wrapper">
+                <select id="occupation-mobile">
+                  <option value="">未選択</option>
+                  <option value="会社員">会社員</option>
+                  <option value="自営業">自営業</option>
+                  <option value="公務員">公務員</option>
+                  <option value="学生">学生</option>
+                  <option value="主婦・主夫">主婦・主夫</option>
+                  <option value="農林水産">農林水産</option>
+                  <option value="観光業">観光業</option>
+                  <option value="医療・福祉">医療・福祉</option>
+                  <option value="教育">教育</option>
+                  <option value="無職">無職</option>
+                  <option value="その他">その他</option>
+                  <option value="不明">不明</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="status-row">
+            <span id="geoStatus-mobile" class="chip">📍 位置情報を取得中…</span>
+            <span id="micStatus-mobile" class="chip">🎙 マイク待機中</span>
+          </div>
+        </section>
+
+        <!-- Card 2: Transcript -->
+        <section class="card">
+          <div class="card-header">
+            <div class="card-title">TRANSCRIPT</div>
+            <div class="card-caption">ヒアリング内容をそのまま記録できます</div>
+          </div>
+
+          <div class="textarea-wrapper">
+            <textarea
+              id="textOutput-mobile"
+              placeholder="住民の方のお話を、要約せずにそのままの言葉で記録してください。&#10;音声入力も利用できます。"
+            ></textarea>
+            <div class="textarea-footer">
+              <span class="hint">Enter で改行できます</span>
+              <span class="char-count"><span id="charCount-mobile">0</span> 文字</span>
+            </div>
+          </div>
+
+          <div class="button-row">
+            <button id="recordBtn-mobile" class="btn btn-secondary">
+              <span class="btn-icon-circle">
+                <span id="micDot-mobile">🎙</span>
+              </span>
+              <span class="btn-label" id="recordLabel-mobile">音声入力を開始</span>
+            </button>
+
+            <button id="sendBtn-mobile" class="btn btn-primary">
+              <span class="spinner"></span>
+              <span class="btn-label">AI解析して保存</span>
+            </button>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div id="toast-mobile" class="toast-mobile"></div>
+  </div>
+
+  <!-- PC版ロジック -->
+  <script>
+    (() => {
+      const recordBtn = document.getElementById("recordBtn");
+      const recordBtnLabel = document.getElementById("recordBtnLabel");
+      const sendBtn = document.getElementById("sendBtn");
+      const textOutput = document.getElementById("textOutput");
+      const charCount = document.getElementById("charCount");
+      const geoStatus = document.getElementById("geoStatus");
+
+      let recognition;
+      let isRecording = false;
+      let isSending = false;
+
+      if ("webkitSpeechRecognition" in window) {
+        recognition = new webkitSpeechRecognition();
+        recognition.lang = "ja-JP";
+        recognition.interimResults = true;
+        recognition.continuous = true;
+
+        recognition.onresult = (event) => {
+          let finalText = "";
+          for (let i = 0; i < event.results.length; i++) {
+            finalText += event.results[i][0].transcript;
+          }
+          textOutput.value = finalText;
+          updateCharCount();
+        };
+
+        recognition.onerror = (e) => {
+          console.error("Speech error:", e);
+          showToast("音声認識でエラーが発生しました。", "error");
+        };
+
+        recognition.onend = () => {
+          isRecording = false;
+          updateRecordButton();
+        };
+      } else {
+        showToast("このブラウザは音声認識に対応していません。", "error");
+        recordBtn.disabled = true;
+      }
+
+      recordBtn.addEventListener("click", () => {
+        if (!recognition || isSending) return;
+
+        if (!isRecording) {
+          recognition.start();
+          isRecording = true;
+        } else {
+          recognition.stop();
+          isRecording = false;
+        }
+        updateRecordButton();
+      });
+
+      function updateRecordButton() {
+        if (!isRecording) {
+          recordBtn.classList.remove("btn-danger");
+          recordBtn.classList.add("btn-outline");
+          recordBtnLabel.textContent = "音声入力を開始";
+        } else {
+          recordBtn.classList.remove("btn-outline");
+          recordBtn.classList.add("btn-danger");
+          recordBtnLabel.textContent = "音声入力を停止";
+        }
+      }
+
+      function updateCharCount() {
+        const len = textOutput.value.length;
+        charCount.textContent = `${len} 文字`;
+      }
+
+      textOutput.addEventListener("input", updateCharCount);
+
+      let currentLat = null;
+      let currentLng = null;
+
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            currentLat = pos.coords.latitude;
+            currentLng = pos.coords.longitude;
+            geoStatus.style.display = "inline-flex";
+          },
+          (err) => {
+            console.warn("Geolocation error:", err);
+          },
+          { enableHighAccuracy: true, timeout: 8000 }
+        );
+      }
+
+      const toastEl = document.getElementById("toast-pc");
+      const toastIconEl = document.getElementById("toastIcon-pc");
+      const toastMsgEl = document.getElementById("toastMessage-pc");
+      let toastTimer = null;
+
+      function showToast(message, type = "info") {
+        toastMsgEl.textContent = message;
+
+        toastEl.classList.remove("success", "error");
+        if (type === "success") {
+          toastEl.classList.add("success");
+          toastIconEl.textContent = "✅";
+        } else if (type === "error") {
+          toastEl.classList.add("error");
+          toastIconEl.textContent = "⚠️";
+        } else {
+          toastIconEl.textContent = "ℹ️";
+        }
+
+        toastEl.classList.add("show");
+
+        if (toastTimer) clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => {
+          toastEl.classList.remove("show");
+        }, 2600);
+      }
+
+      async function saveData() {
+        if (isSending) return;
+
+        const area = document.getElementById("area").value;
+        const source = document.getElementById("source").value;
+        const text = textOutput.value.trim();
+        const age = document.getElementById("age").value;
+        const gender = document.getElementById("gender").value;
+        const occupation = document.getElementById("occupation").value;
+
+
+        if (!text) {
+          showToast("内容が空です。入力してから送信してください。", "error");
+          return;
+        }
+
+        const payload = {
+          text,
+          area,
+          source,
+          age,
+          gender,
+          occupation,
+          lat: currentLat,
+          lng: currentLng,
+        };
+
+        try {
+          isSending = true;
+          sendBtn.disabled = true;
+          recordBtn.disabled = true;
+          sendBtn.classList.add("btn-loading");
+
+          const res = await fetch("/analyze", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+
+          if (!res.ok) {
+            console.error("API Error:", res.status, await res.text());
+            showToast("AI解析または保存に失敗しました。", "error");
+            return;
+          }
+
+          const result = await res.json();
+          console.log("解析結果:", result);
+          showToast("AI解析 → Supabase 保存が完了しました。", "success");
+
+          textOutput.value = "";
+          updateCharCount();
+        } catch (e) {
+          console.error(e);
+          showToast(
+            "通信エラーが発生しました。ネットワークを確認してください。",
+            "error"
+          );
+        } finally {
+          isSending = false;
+          sendBtn.disabled = false;
+          recordBtn.disabled = !recognition;
+          sendBtn.classList.remove("btn-loading");
+          updateRecordButton();
+        }
+      }
+
+      window.saveData = saveData;
+    })();
+  </script>
+
+  <!-- モバイル版ロジック -->
+  <script>
+    (() => {
+      const textOutput = document.getElementById("textOutput-mobile");
+      const charCountEl = document.getElementById("charCount-mobile");
+      const recordBtn = document.getElementById("recordBtn-mobile");
+      const recordLabel = document.getElementById("recordLabel-mobile");
+      const micStatus = document.getElementById("micStatus-mobile");
+      const micDot = document.getElementById("micDot-mobile");
+      const sendBtn = document.getElementById("sendBtn-mobile");
+      const geoStatus = document.getElementById("geoStatus-mobile");
+      const toastEl = document.getElementById("toast-mobile");
+
+      let currentLat = null;
+      let currentLng = null;
+      let isRecording = false;
+      let isSending = false;
+      let recognition = null;
+
+      textOutput.addEventListener("input", () => {
+        charCountEl.textContent = textOutput.value.length;
+      });
+
+      function initGeolocation() {
+        if (!("geolocation" in navigator)) {
+          geoStatus.textContent = "📍 位置情報が利用できません";
+          geoStatus.classList.add("chip-error");
+          return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            currentLat = pos.coords.latitude;
+            currentLng = pos.coords.longitude;
+            geoStatus.textContent = "📍 位置情報を取得しました";
+            geoStatus.classList.remove("chip-error");
+            geoStatus.classList.add("chip-success");
+          },
+          () => {
+            geoStatus.textContent = "📍 位置情報が取得できませんでした";
+            geoStatus.classList.add("chip-error");
+          },
+          { enableHighAccuracy: true, timeout: 8000 }
+        );
+      }
+
+      function initSpeech() {
+        if ("webkitSpeechRecognition" in window) {
+          recognition = new webkitSpeechRecognition();
+          recognition.lang = "ja-JP";
+          recognition.interimResults = true;
+          recognition.continuous = true;
+
+          recognition.onresult = (event) => {
+            let finalText = "";
+            for (let i = 0; i < event.results.length; i++) {
+              finalText += event.results[i][0].transcript;
+            }
+            textOutput.value = finalText;
+            charCountEl.textContent = finalText.length;
+          };
+
+          recognition.onstart = () => {
+            micStatus.textContent = "🎙 録音中…";
+            micStatus.classList.remove("chip-error");
+            micStatus.classList.add("chip-success");
+          };
+
+          recognition.onend = () => {
+            micStatus.textContent = "🎙 マイク待機中";
+            micStatus.classList.remove("chip-success");
+          };
+
+          recognition.onerror = () => {
+            micStatus.textContent = "🎙 マイクでエラーが発生しました";
+            micStatus.classList.add("chip-error");
+          };
+        } else {
+          micStatus.textContent = "🎙 この端末は音声入力に対応していません";
+          micStatus.classList.add("chip-error");
+        }
+      }
+
+      function addPressAnimation(btn) {
+        const start = () => btn.classList.add("btn-pressed");
+        const end = () => btn.classList.remove("btn-pressed");
+        btn.addEventListener("mousedown", start);
+        btn.addEventListener("touchstart", start, { passive: true });
+        window.addEventListener("mouseup", end);
+        window.addEventListener("touchend", end);
+        window.addEventListener("touchcancel", end);
+      }
+
+      addPressAnimation(recordBtn);
+      addPressAnimation(sendBtn);
+
+      recordBtn.addEventListener("click", () => {
+        if (!recognition) {
+          showToast("音声入力に対応していない端末です", true);
+          return;
+        }
+
+        if (!isRecording) {
+          recognition.start();
+          isRecording = true;
+          recordBtn.classList.add("recording");
+          recordLabel.textContent = "音声入力を停止";
+          micDot.innerHTML = '<span class="pulse-dot"></span>';
+        } else {
+          recognition.stop();
+          isRecording = false;
+          recordBtn.classList.remove("recording");
+          recordLabel.textContent = "音声入力を開始";
+          micDot.textContent = "🎙";
+        }
+      });
+
+      sendBtn.addEventListener("click", async () => {
+        if (isSending) return;
+
+        const area = document.getElementById("area-mobile").value;
+        const source = document.getElementById("source-mobile").value;
+        const text = textOutput.value.trim();
+
+        if (!text) {
+          showToast("内容が空です", true);
+          return;
+        }
+
+        isSending = true;
+        sendBtn.classList.add("loading");
+        sendBtn.disabled = true;
+
+        const payload = {
+          text,
+          area,
+          source,
+          age,
+          gender,
+          occupation,
+          lat: currentLat,
+          lng: currentLng,
+        };
+
+        try {
+          const res = await fetch("/analyze", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+
+          if (!res.ok) {
+            console.error("API Error", res.status, await res.text());
+            showToast("AI解析 or 保存に失敗しました", true);
+          } else {
+            await res.json();
+            showToast("送信が完了しました ✅");
+            textOutput.value = "";
+            charCountEl.textContent = "0";
+          }
+        } catch (err) {
+          console.error(err);
+          showToast("通信エラーが発生しました", true);
+        } finally {
+          isSending = false;
+          sendBtn.classList.remove("loading");
+          sendBtn.disabled = false;
+        }
+      });
+
+      let toastTimeout = null;
+      function showToast(message, isError = false) {
+        toastEl.textContent = message;
+        toastEl.classList.toggle("error", isError);
+        toastEl.classList.add("show");
+        if (toastTimeout) clearTimeout(toastTimeout);
+        toastTimeout = setTimeout(() => {
+          toastEl.classList.remove("show");
+        }, 2300);
+      }
+
+      initGeolocation();
+      initSpeech();
+    })();
+  </script>
+<body>
+</html>

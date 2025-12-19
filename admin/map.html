@@ -1,0 +1,1135 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>Kumano Compass - 課題マップ</title>
+
+  <!-- Leaflet -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
+
+  <style>
+    :root {
+      --kc-bg: #f5f7fb;
+      --kc-primary: #246bfd;
+      --kc-primary-soft: rgba(36, 107, 253, 0.12);
+      --kc-border: #dde3f0;
+      --kc-text-main: #1f2933;
+      --kc-text-sub: #6b7280;
+      --kc-danger: #e53935;
+      --kc-radius-lg: 16px;
+      --kc-radius-md: 10px;
+      --kc-shadow-soft: 0 12px 30px rgba(15, 23, 42, 0.18);
+      --kc-nav-height: 64px;
+      --kc-nav-height-mobile: 56px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+        sans-serif;
+      background: var(--kc-bg);
+      color: var(--kc-text-main);
+      overflow: hidden;
+    }
+
+    /* ===== 上部ツールバー（銀行アプリ風） ===== */
+    .toolbar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 64px;
+      padding: 0 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      background: linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0.94),
+        rgba(248, 251, 255, 0.96)
+      );
+      border-bottom: 1px solid rgba(209, 213, 219, 0.7);
+      z-index: 1000;
+    }
+
+    .toolbar-left,
+    .toolbar-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .toolbar-title {
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      font-size: 16px;
+      color: var(--kc-text-main);
+    }
+
+    .toolbar-sub {
+      font-size: 11px;
+      color: var(--kc-text-sub);
+      margin-top: 2px;
+    }
+
+    .toolbar-center {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .toolbar-button {
+      border: none;
+      border-radius: 999px;
+      padding: 7px 14px;
+      font-size: 12px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      background: white;
+      color: var(--kc-text-main);
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+      transition:
+        transform 0.13s ease-out,
+        box-shadow 0.13s ease-out,
+        background 0.13s ease-out,
+        color 0.13s ease-out;
+    }
+
+    .toolbar-button.primary {
+      background: var(--kc-primary);
+      color: white;
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.45);
+    }
+
+    .toolbar-button.icon-only {
+      padding-inline: 10px;
+      border-radius: 50%;
+      width: 34px;
+      height: 34px;
+      justify-content: center;
+    }
+
+    .toolbar-button span.icon {
+      font-size: 14px;
+    }
+
+    .toolbar-button:hover {
+      transform: translateY(-1px) scale(1.04);
+      box-shadow: 0 6px 16px rgba(15, 23, 42, 0.25);
+      background: #f9fafb;
+    }
+
+    .toolbar-button.primary:hover {
+      background: #1f60e7;
+      box-shadow: 0 7px 18px rgba(37, 99, 235, 0.55);
+    }
+
+    .toolbar-button:active {
+      transform: translateY(0) scale(0.97);
+      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.20);
+    }
+
+    /* ===== マップ本体 ===== */
+    #map {
+      position: absolute;
+      inset: 64px 0 0 0; /* 上はツールバー分あける */
+      width: 100%;
+      height: calc(100vh - 64px);
+      z-index: 1;
+    }
+
+    /* ===== 凡例 ===== */
+    .legend {
+      background: rgba(255, 255, 255, 0.95);
+      padding: 10px 12px;
+      line-height: 1.4;
+      font-size: 11px;
+      border-radius: 12px;
+      box-shadow: 0 10px 20px rgba(15, 23, 42, 0.2);
+      border: 1px solid rgba(209, 213, 219, 0.9);
+    }
+    .legend-title {
+      font-weight: 600;
+      margin-bottom: 4px;
+      font-size: 11px;
+      color: var(--kc-text-sub);
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      margin-bottom: 3px;
+    }
+    .legend-color {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      margin-right: 6px;
+      border: 1px solid #555;
+    }
+    .legend-label {
+      white-space: nowrap;
+    }
+
+    /* ===== サマリーパネル（AIレポート表示） ===== */
+    .summary-panel-wrapper {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      pointer-events: none;
+      z-index: 1100;
+    }
+
+    .summary-panel {
+      margin: 0 auto;
+      max-width: 960px;
+      background: #ffffff;
+      border-radius: 16px 16px 0 0;
+      box-shadow: var(--kc-shadow-soft);
+      border-top: 1px solid rgba(226, 232, 240, 0.9);
+      transform: translateY(100%);
+      opacity: 0;
+      transition:
+        transform 0.26s cubic-bezier(0.16, 0.84, 0.44, 1),
+        opacity 0.2s ease-out;
+      pointer-events: auto;
+    }
+
+    .summary-panel.visible {
+      transform: translateY(0%);
+      opacity: 1;
+    }
+
+    .summary-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 16px 6px;
+      border-bottom: 1px solid #edf2ff;
+    }
+
+    .summary-header-main {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .summary-title {
+      font-size: 13px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .summary-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 6px;
+      border-radius: 999px;
+      font-size: 11px;
+      background: var(--kc-primary-soft);
+      color: var(--kc-primary);
+    }
+
+    .summary-subtitle {
+      font-size: 11px;
+      color: var(--kc-text-sub);
+    }
+
+    .summary-close-btn {
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--kc-text-sub);
+      transition:
+        background 0.12s ease-out,
+        transform 0.12s ease-out;
+    }
+
+    .summary-close-btn:hover {
+      background: #f3f4ff;
+      transform: rotate(5deg);
+    }
+
+    .summary-body {
+      padding: 10px 16px 14px;
+      max-height: 40vh;
+      overflow-y: auto;
+      font-size: 13px;
+      line-height: 1.6;
+      color: #374151;
+      white-space: pre-wrap;
+    }
+
+    .summary-body::-webkit-scrollbar {
+      width: 6px;
+    }
+    .summary-body::-webkit-scrollbar-thumb {
+      background: #cbd5f5;
+      border-radius: 999px;
+    }
+
+    .summary-loading {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--kc-text-sub);
+    }
+
+    .spinner {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      border: 2px solid #cbd5ff;
+      border-top-color: var(--kc-primary);
+      animation: spin 0.6s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(1turn);
+      }
+    }
+
+    /* ===== Leaflet popup内のAIボタン ===== */
+    .popup-ai-btn {
+      margin-top: 6px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      border: none;
+      background: var(--kc-primary-soft);
+      color: var(--kc-primary);
+      font-size: 11px;
+      cursor: pointer;
+      transition:
+        background 0.12s ease-out,
+        transform 0.12s ease-out,
+        box-shadow 0.12s ease-out;
+    }
+
+    .popup-ai-btn:hover {
+      background: rgba(36, 107, 253, 0.18);
+      transform: translateY(-1px);
+      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.25);
+    }
+
+    .popup-ai-btn:active {
+      transform: translateY(0);
+      box-shadow: none;
+    }
+
+    /* スマホ対応（map画面用） */
+    @media (max-width: 768px) {
+      /* ナビの下からマップを表示（共通メニューバーはそのまま） */
+      #map {
+        position: absolute;
+        inset: 78px 0 0 0;                 /* 上はナビ＋少し余裕 */
+        height: calc(100vh - 78px);
+        width: 100%;
+      }
+
+      /* Leafletのコントロール類を少し大きく、押しやすく */
+      .leaflet-control-zoom {
+        border-radius: 999px;
+        overflow: hidden;
+        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.35);
+      }
+
+      .leaflet-control-zoom a {
+        width: 32px;
+        height: 32px;
+        line-height: 30px;
+        font-size: 18px;
+      }
+
+      /* 凡例は小さめのチップ風に */
+      .legend {
+        font-size: 10px;
+        padding: 8px 10px;
+        border-radius: 999px;
+        box-shadow: 0 8px 18px rgba(15, 23, 42, 0.25);
+      }
+
+      .legend-title {
+        font-size: 10px;
+      }
+
+      /* ボトムシート（AIレポート）をフル幅＋少し高めに */
+      .summary-panel-wrapper {
+        padding: 0 6px 6px;
+      }
+
+      .summary-panel {
+        max-width: 100%;
+        border-radius: 18px 18px 0 0;
+      }
+
+      .summary-handle {
+        width: 40px;
+        height: 4px;
+        border-radius: 999px;
+        background: rgba(148, 163, 184, 0.9);
+        margin: 6px auto 4px;
+      }
+
+      .summary-body {
+        max-height: 52vh;       /* 画面の約半分ちょっとまで表示 */
+        font-size: 12px;
+      }
+    }
+
+    /* ==== Kumano Compass 共通ナビバー ==================== */
+    .kc-nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 64px;
+      z-index: 1000;
+      padding: 0 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at top left,
+                  rgba(226, 239, 255, 0.95),
+                  rgba(255, 255, 255, 0.98));
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      box-shadow: 0 14px 30px rgba(15, 23, 42, 0.10);
+      border-bottom: 1px solid rgba(209, 213, 219, 0.7);
+    }
+
+    .kc-nav-inner {
+      width: 100%;
+      max-width: 1120px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .kc-nav-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+      cursor: pointer;
+      padding: 6px 0;
+      border: none;
+      background: transparent;
+    }
+
+    .kc-nav-logo-dot {
+      width: 24px;
+      height: 24px;
+      border-radius: 999px;
+      background: radial-gradient(circle at 30% 20%, #ffffff 0, #93c5fd 35%, #2563eb 100%);
+      box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.22);
+      animation: kc-nav-breath 3.2s ease-in-out infinite;
+    }
+
+    .kc-nav-logo-text {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .kc-nav-title {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      color: #111827; /* 濃いめの文字色に固定 */
+    }
+
+    .kc-nav-sub {
+      font-size: 11px;
+      color: #6b7280;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .kc-nav-center {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .kc-nav-link {
+      position: relative;
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-size: 12px;
+      color: #4b5563;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid rgba(148, 163, 184, 0.7); /* ← 枠線つける */
+      background: rgba(255, 255, 255, 0.9);
+      cursor: pointer;
+      transition:
+        background 0.18s ease-out,
+        color 0.18s ease-out,
+        transform 0.18s ease-out,
+        border-color 0.18s ease-out;
+    }
+
+    .kc-nav-link::after {
+      content: "";
+      position: absolute;
+      left: 14px;
+      right: 14px;
+      bottom: 4px;
+      height: 2px;
+      border-radius: 999px;
+      background: rgba(37, 99, 235, 0.9);
+      transform: scaleX(0);
+      transform-origin: center;
+      transition: transform 0.2s ease-out;
+    }
+
+    .kc-nav-link:hover {
+      background: rgba(239, 246, 255, 0.95);
+      border-color: rgba(59, 130, 246, 0.9); /* ホバー時に枠を少し濃く */
+      transform: translateY(-1px);
+    }
+
+    .kc-nav-link:hover::after {
+      transform: scaleX(1);
+    }
+
+    .kc-nav-link.active {
+      background: rgba(219, 234, 254, 0.95);
+      color: #1d4ed8;
+      border-color: rgba(37, 99, 235, 1); /* アクティブはしっかり青枠 */
+    }
+
+    .kc-nav-link.active::after {
+      transform: scaleX(1);
+    }
+
+    .kc-nav-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .kc-nav-pill {
+      font-size: 10px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(148, 163, 184, 0.12);
+      color: #6b7280;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .kc-nav-pill-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #22c55e;
+      box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.35);
+    }
+
+    /* コンテンツ押し下げ用（index/adminで使う） */
+    .kc-nav-spacer {
+      height: 72px;
+    }
+
+    .kc-nav-cta {
+  border-radius: 999px;
+  padding: 7px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  background: linear-gradient(135deg, #2563eb, #4f46e5);
+  color: #ffffff;
+  border: 1px solid rgba(37, 99, 235, 1); /* ← 枠線追加 */
+  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.45);
+  transition:
+    transform 0.16s ease-out,
+    box-shadow 0.18s ease-out,
+    opacity 0.16s ease-out,
+    border-color 0.18s ease-out;
+}
+
+.kc-nav-cta:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 16px 30px rgba(37, 99, 235, 0.55);
+  border-color: #1d4ed8;
+}
+
+.kc-nav-cta:active {
+  transform: translateY(0);
+  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.45);
+}
+
+    /* アニメーション */
+
+    @keyframes kc-nav-slide-in {
+      from {
+        transform: translateY(-100%);
+        opacity: 0;
+      }
+      to {
+        transform: translateY(0%);
+        opacity: 1;
+      }
+    }
+
+    @keyframes kc-nav-breath {
+      0% {
+        transform: scale(1);
+        box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.22);
+      }
+      50% {
+        transform: scale(1.06);
+        box-shadow: 0 0 0 8px rgba(37, 99, 235, 0.0);
+      }
+      100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.22);
+      }
+    }
+
+    /* === 共通メニューバー：スマホ用レイアウト（視認性重視） === */
+    @media (max-width: 768px) {
+      .kc-nav {
+        height: 70px;
+        padding: 6px 10px;
+      }
+
+      .kc-nav-inner {
+        align-items: center;
+        gap: 6px;
+      }
+
+      .kc-nav-left {
+        gap: 6px;
+      }
+
+      .kc-nav-logo-dot {
+        width: 22px;
+        height: 22px;
+      }
+
+      .kc-nav-title {
+        font-size: 13px;
+      }
+
+      /* 説明文はスマホでは非表示にしてナビをスッキリ */
+      .kc-nav-sub {
+        display: none;
+      }
+
+      /* 中央タブ：3つを均等幅の大きなボタンにする */
+      .kc-nav-center {
+        flex: 1;
+        justify-content: space-between;
+        gap: 4px;
+      }
+
+      .kc-nav-link {
+        flex: 1;                     /* 3つで横幅を等分 */
+        justify-content: center;
+        padding: 8px 4px;
+        font-size: 11px;
+      }
+
+      /* これまで隠していたラベルもスマホで表示して視認性UP */
+      .kc-nav-link span:last-child {
+        display: inline;
+      }
+
+      /* ステータスピル（オンライン／Supabase連携中）は隠す */
+      .kc-nav-right .kc-nav-pill {
+        display: none;
+      }
+
+      /* mapページなどのCTAボタンは小さめに残す */
+      .kc-nav-right .kc-nav-cta {
+        padding: 6px 10px;
+        font-size: 11px;
+      }
+
+      /* コンテンツの押し下げ量も少し増やす */
+      .kc-nav-spacer {
+        height: 78px;
+      }
+    }
+    
+  </style>
+</head>
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const links = document.querySelectorAll(".kc-nav-link");
+    if (!links.length) return;
+
+    // 現在のパスを取得して末尾のスラッシュを削る（/admin/ → /admin）
+    const rawPath = window.location.pathname || "/";
+    const currentPath =
+      rawPath.length > 1 ? rawPath.replace(/\/+$/, "") : rawPath;
+
+    links.forEach((btn) => {
+      const href = btn.getAttribute("data-nav-href");
+      if (!href) return;
+
+      const hrefNorm =
+        href.length > 1 ? href.replace(/\/+$/, "") : href;
+
+      // 完全一致したときだけ active を付与
+      if (currentPath === hrefNorm) {
+        btn.classList.add("active");
+      }
+
+      btn.addEventListener("click", () => {
+        window.location.href = href;
+      });
+    });
+
+    // （モバイルメニューを後で入れたい場合用のフック）
+    const burger = document.querySelector(".kc-nav-burger");
+    const mobileMenu = document.querySelector(".kc-nav-mobile-menu");
+    if (burger && mobileMenu) {
+      burger.addEventListener("click", () => {
+        burger.classList.toggle("open");
+        mobileMenu.classList.toggle("open");
+      });
+
+      mobileMenu.querySelectorAll("[data-nav-href]").forEach((item) => {
+        item.addEventListener("click", () => {
+          const href = item.getAttribute("data-nav-href");
+          if (href) {
+            window.location.href = href;
+          }
+        });
+      });
+    }
+  });
+</script>
+<body>
+  <div class="kc-nav">
+  <div class="kc-nav-inner">
+    <!-- 左ロゴ：クリックで一覧へ戻る -->
+    <button
+      class="kc-nav-left"
+      type="button"
+      onclick="window.location.href='/admin'"
+    >
+      <div class="kc-nav-logo-dot"></div>
+      <div class="kc-nav-logo-text">
+        <div class="kc-nav-title">Kumano Compass</div>
+        <div class="kc-nav-sub">課題マップ · 地域の声 × AI</div>
+      </div>
+    </button>
+
+    <div class="kc-nav-center">
+      <button
+        class="kc-nav-link"
+        type="button"
+        data-nav-href="/public/index.html"
+        data-nav-key="input"
+      >
+        <span>📝</span><span>入力</span>
+      </button>
+      <button
+        class="kc-nav-link"
+        type="button"
+        data-nav-href="/admin"
+        data-nav-key="admin"
+      >
+        <span>📊</span><span>一覧</span>
+      </button>
+      <button
+        class="kc-nav-link"
+        type="button"
+        data-nav-href="/admin/map"
+        data-nav-key="map"
+      >
+        <span>🗺</span><span>マップ</span>
+      </button>
+    </div>
+
+    <!-- 右側：全体AIレポートCTA -->
+    <div class="kc-nav-right">
+      <button
+        class="kc-nav-cta"
+        type="button"
+        onclick="fetchGlobalReport()"
+        title="全体AIレポート"
+      >
+        <span>💡</span><span>全体AIレポート</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+  <!-- マップ -->
+  <div id="map"></div>
+
+  <!-- AIレポート表示パネル -->
+  <div class="summary-panel-wrapper">
+    <div id="summary-panel" class="summary-panel">
+      <div class="summary-handle"></div>
+      <div class="summary-header">
+        <div class="summary-header-main">
+          <div class="summary-title">
+            <span id="summary-icon">💡</span>
+            <span id="summary-title-text">AI分析レポート</span>
+            <span id="summary-chip" class="summary-chip">
+              <span>全体</span>
+            </span>
+          </div>
+          <div id="summary-subtitle" class="summary-subtitle">
+            地域全体の傾向や背景、今後の論点をAIが整理します。
+          </div>
+        </div>
+        <button
+          class="summary-close-btn"
+          onclick="hideSummaryPanel()"
+          title="閉じる"
+        >
+          ✕
+        </button>
+      </div>
+      <div id="summary-body" class="summary-body">
+        ここにAIによる分析レポートが表示されます。
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ----------------------------
+    //  Leaflet マップの初期化
+    // ----------------------------
+    const map = L.map("map").setView([33.88, 136.1], 9);
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 18,
+      attribution: "&copy; OpenStreetMap contributors",
+    }).addTo(map);
+
+    // ----------------------------
+    //  地区 → 代表座標
+    // ----------------------------
+    const AREA_COORDS = {
+      神川: [33.957, 136.004],
+      木本: [33.887, 136.101],
+      飛鳥: [33.936, 136.2],
+      市木: [33.957, 136.3],
+      紀和: [33.899, 135.96],
+    };
+
+    // ----------------------------
+    //  カテゴリ → 色
+    // ----------------------------
+    const CATEGORY_COLORS = {
+      交通: "#e53935",
+      医療: "#8e24aa",
+      "高齢化・福祉": "#3949ab",
+      "子育て・教育": "#1e88e5",
+      観光: "#00897b",
+      "商店街・地域経済": "#43a047",
+      自然環境: "#fdd835",
+      "防災・津波": "#fb8c00",
+      行政サービス: "#6d4c41",
+      未分類: "#757575",
+    };
+
+    function getCategoryColor(category) {
+      return CATEGORY_COLORS[category] || "#3388ff";
+    }
+
+    // 重要度スコア → マーカー半径
+    function getMarkerRadius(importance) {
+      const base = 6;
+      if (typeof importance !== "number" || isNaN(importance)) {
+        return base;
+      }
+      const extra = Math.min(8, importance * 2);
+      return base + extra;
+    }
+
+    // 同じ地区のマーカー重なり防止（少しだけ座標をずらす）
+    function jitterCoords(lat, lng, uniqueKey) {
+      let hash = 0;
+      for (let i = 0; i < uniqueKey.length; i++) {
+        hash = (hash * 31 + uniqueKey.charCodeAt(i)) & 0xffffffff;
+      }
+      const angle = ((hash % 360) * Math.PI) / 180;
+      const maxDistance = 0.0005;
+      const distance = (((hash >>> 8) % 100) / 100) * maxDistance;
+      const dLat = Math.cos(angle) * distance;
+      const dLng = Math.sin(angle) * distance;
+
+      return { lat: lat + dLat, lng: lng + dLng };
+    }
+
+    // ----------------------------
+    //  Supabase由来のデータ取得（FastAPI 経由）
+    // ----------------------------
+    async function loadVoices() {
+      try {
+        const res = await fetch("/admin/api/voices");
+        if (!res.ok) {
+          console.error("API error", res.status, await res.text());
+          return;
+        }
+        const voices = await res.json();
+        plotVoices(voices);
+      } catch (e) {
+        console.error("loadVoices error:", e);
+      }
+    }
+
+    // ----------------------------
+    //  マーカー描画
+    // ----------------------------
+    function plotVoices(voices) {
+      voices.forEach((v) => {
+        let lat = v.lat;
+        let lng = v.lng;
+        let usedAreaFallback = false;
+
+        // 位置情報が無い場合は地区代表座標
+        if ((lat == null || lng == null) && v.area && AREA_COORDS[v.area]) {
+          [lat, lng] = AREA_COORDS[v.area];
+          usedAreaFallback = true;
+        }
+
+        if (lat == null || lng == null) return;
+
+        // 地区代表座標経由のときのみ、idベースで少しずらす
+        if (usedAreaFallback && v.id) {
+          const jittered = jitterCoords(lat, lng, v.id);
+          lat = jittered.lat;
+          lng = jittered.lng;
+        }
+
+        const color = getCategoryColor(v.category);
+        const radius = getMarkerRadius(v.importance_score);
+
+        const marker = L.circleMarker([lat, lng], {
+          radius,
+          color,
+          fillColor: color,
+          fillOpacity: 0.8,
+          weight: 2,
+        }).addTo(map);
+
+        const sentimentText = v.sentiment
+          ? `${v.sentiment} (${(v.sentiment_score ?? 0).toFixed(2)})`
+          : "-";
+
+        const importanceText =
+          typeof v.importance_score === "number"
+            ? v.importance_score.toFixed(2)
+            : "-";
+
+        const sourceLabel =
+          v.source === "local"
+            ? "地域の方々"
+            : v.source === "ivusa"
+            ? "学生"
+            : v.source === "tourist"
+            ? "観光客"
+            : (v.source ?? "-");
+
+        const attrParts = [];
+        if (sourceLabel && sourceLabel !== "-") attrParts.push(sourceLabel);
+        if (v.age) attrParts.push(v.age);
+        if (v.gender) attrParts.push(v.gender);
+        if (v.occupation) attrParts.push(v.occupation);
+        const attrText = attrParts.length ? attrParts.join(" / ") : "-";
+
+        const popupHtml = `
+          <div style="font-size:12px;">
+            <strong>地区:</strong> ${v.area ?? "-"}<br/>
+            <strong>属性:</strong> ${attrText}<br/>
+            <strong>カテゴリ:</strong> ${v.category ?? "-"}<br/>
+            <strong>感情:</strong> ${sentimentText}<br/>
+            <strong>重要度:</strong> ${importanceText}<br/>
+            <hr/>
+            <strong>内容:</strong><br/>
+            ${(v.raw_text ?? "").replace(/\n/g, "<br/>")}
+            <div style="margin-top:6px;">
+              <button class="popup-ai-btn" onclick="openVoiceReport('${
+                v.id
+              }', '${(v.area ?? "").replace(/'/g, "\\'")}')">
+                <span>🔍</span><span>この地点をAI分析</span>
+              </button>
+            </div>
+          </div>
+        `;
+
+        marker.bindPopup(popupHtml);
+      });
+
+      addLegend();
+    }
+
+    // ----------------------------
+    //  凡例
+    // ----------------------------
+    function addLegend() {
+      const legend = L.control({ position: "bottomright" });
+
+      legend.onAdd = function () {
+        const div = L.DomUtil.create("div", "legend");
+        div.innerHTML = `<div class="legend-title">CATEGORY</div>`;
+        Object.entries(CATEGORY_COLORS).forEach(([cat, color]) => {
+          const item = document.createElement("div");
+          item.className = "legend-item";
+
+          const dot = document.createElement("span");
+          dot.className = "legend-color";
+          dot.style.backgroundColor = color;
+
+          const label = document.createElement("span");
+          label.className = "legend-label";
+          label.textContent = cat;
+
+          item.appendChild(dot);
+          item.appendChild(label);
+          div.appendChild(item);
+        });
+        return div;
+      };
+
+      legend.addTo(map);
+    }
+
+    // ----------------------------
+    //  AIレポート用サマリーパネル制御
+    // ----------------------------
+    const summaryPanel = document.getElementById("summary-panel");
+    const summaryBody = document.getElementById("summary-body");
+    const summaryTitleText = document.getElementById("summary-title-text");
+    const summaryIcon = document.getElementById("summary-icon");
+    const summaryChip = document.getElementById("summary-chip");
+    const summarySubtitle = document.getElementById("summary-subtitle");
+
+    function showSummaryPanel() {
+      summaryPanel.classList.add("visible");
+    }
+
+    function hideSummaryPanel() {
+      summaryPanel.classList.remove("visible");
+    }
+
+    function showLoading(text = "AIが分析しています…") {
+      summaryBody.innerHTML = `
+        <div class="summary-loading">
+          <div class="spinner"></div>
+          <span>${text}</span>
+        </div>
+      `;
+    }
+
+    // ----------------------------
+    //  全体AIレポート取得
+    // ----------------------------
+    async function fetchGlobalReport() {
+      summaryTitleText.textContent = "全体AIレポート";
+      summaryIcon.textContent = "💡";
+      summaryChip.innerHTML = "<span>全体</span>";
+      summarySubtitle.textContent =
+        "全体の傾向・エリア別の特徴・優先度の高い論点をAIが整理します。";
+
+      showSummaryPanel();
+      showLoading();
+
+      try {
+        const res = await fetch("/admin/api/report/global");
+        if (!res.ok) {
+          const t = await res.text();
+          summaryBody.textContent =
+            "レポート取得に失敗しました: " + res.status + " / " + t;
+          return;
+        }
+        const data = await res.json();
+        summaryBody.textContent = data.text ?? "レポートを取得できませんでした。";
+      } catch (e) {
+        console.error(e);
+        summaryBody.textContent = "レポート取得中にエラーが発生しました。";
+      }
+    }
+
+    // ----------------------------
+    //  個別スポットAIレポート
+    //  （Leafletポップアップ内のボタンから呼ばれる）
+    // ----------------------------
+    async function openVoiceReport(voiceId, areaLabel) {
+      summaryTitleText.textContent = "スポットAI分析";
+      summaryIcon.textContent = "🔍";
+      summaryChip.innerHTML = `<span>${areaLabel || "個別"}</span>`;
+      summarySubtitle.textContent =
+        "この地点に関する課題の背景や潜在的な論点、関係者ごとの打ち手をAIが整理します。";
+
+      showSummaryPanel();
+      showLoading("この地点の情報を分析しています…");
+
+      try {
+        const res = await fetch(`/admin/api/report/voice/${voiceId}`);
+        if (!res.ok) {
+          const t = await res.text();
+          summaryBody.textContent =
+            "レポート取得に失敗しました: " + res.status + " / " + t;
+          return;
+        }
+        const data = await res.json();
+        summaryBody.textContent = data.text ?? "レポートを取得できませんでした。";
+      } catch (e) {
+        console.error(e);
+        summaryBody.textContent = "レポート取得中にエラーが発生しました。";
+      }
+    }
+
+    // Leafletポップアップから呼べるようにグローバル公開
+    window.openVoiceReport = openVoiceReport;
+
+    // 実行
+    loadVoices();
+  </script>
+</body>
+</html>

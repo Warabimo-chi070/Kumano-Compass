@@ -1,0 +1,993 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>Kumano Compass - 管理ダッシュボード</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      --bg: #f3f6fb;
+      --card: #ffffff;
+      --accent: #2563eb;
+      --accent-soft: rgba(37, 99, 235, 0.06);
+      --text-main: #020617;
+      --text-sub: #6b7280;
+      --radius-lg: 18px;
+      --radius-md: 12px;
+      --shadow-soft: 0 20px 40px rgba(15, 23, 42, 0.12);
+      --border-subtle: rgba(148, 163, 184, 0.55);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top, #e0edff 0, #f3f6fb 50%, #e5ecf6 100%);
+      color: var(--text-main);
+    }
+
+    .app-shell {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 82px 16px 32px;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 20px;
+      margin-bottom: 16px;
+    }
+
+    .brand {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .brand-title {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+    }
+
+    .brand-sub {
+      font-size: 12px;
+      color: var(--text-sub);
+      max-width: 520px;
+      line-height: 1.6;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .pill {
+      font-size: 10px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.04);
+      color: var(--text-sub);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .pill-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #22c55e;
+      box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.28);
+    }
+
+    .btn {
+      border: none;
+      padding: 8px 14px;
+      border-radius: 999px;
+      font-size: 12px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      background: rgba(15, 23, 42, 0.04);
+      color: #0f172a;
+      transition: background 0.16s ease-out, transform 0.08s ease-out, box-shadow 0.16s ease-out;
+      box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+      color: #ffffff;
+      box-shadow: 0 18px 36px rgba(37, 99, 235, 0.5);
+    }
+
+    .btn:hover {
+      transform: translateY(-1px) scale(1.04);
+      box-shadow: 0 16px 32px rgba(15, 23, 42, 0.25);
+      background: rgba(15, 23, 42, 0.06);
+    }
+
+    .btn-primary:hover {
+      background: linear-gradient(135deg, #2c6fff, #2053e3);
+      box-shadow: 0 22px 42px rgba(37, 99, 235, 0.6);
+    }
+
+    .btn:active {
+      transform: scale(0.96) translateY(1px);
+      box-shadow: 0 8px 18px rgba(15, 23, 42, 0.2);
+    }
+
+    .btn-icon {
+      width: 17px;
+      height: 17px;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.15);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+    }
+
+    /* カード（「住民の声（最新20件）」） */
+    .card {
+      margin-top: 4px;
+      background: rgba(255, 255, 255, 0.98);
+      border-radius: 18px;
+      padding: 16px 18px 18px;
+      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+      border: 1px solid rgba(148, 163, 184, 0.38);
+    }
+
+    .card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at top right,
+        rgba(59, 130, 246, 0.08),
+        transparent 60%);
+      pointer-events: none;
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .card-title {
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+    }
+
+    .card-sub {
+      font-size: 11px;
+      color: var(--text-sub);
+      margin-top: 2px;
+      line-height: 1.5;
+      max-width: 480px;
+      white-space: normal; /* きちんと折り返す */
+    }
+
+    /* 右側の再読み込みボタン */
+    .card-header .btn {
+      white-space: nowrap;
+    }
+
+    /* テーブル */
+    .table-wrapper {
+      margin-top: 8px;
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      border: 1px solid rgba(148, 163, 184, 0.4);
+      background: linear-gradient(to bottom, #f9fafb, #ffffff);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    thead {
+      background: rgba(15, 23, 42, 0.04);
+      border-bottom: 1px solid rgba(148, 163, 184, 0.4);
+    }
+
+    th, td {
+      padding: 8px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 600;
+      color: #6b7280;
+      user-select: none;
+    }
+
+    tbody tr {
+      background: #ffffff;
+      transition: background 0.16s ease-out, transform 0.08s ease-out, box-shadow 0.16s ease-out;
+    }
+
+    tbody tr:nth-child(even) {
+      background: #f9fafb;
+    }
+
+    tbody tr:hover {
+      background: #eef4ff;
+      transform: translateY(-1px);
+      box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+    }
+
+    td:first-child {
+      border-left: 3px solid transparent;
+    }
+
+    tbody tr:hover td:first-child {
+      border-left-color: rgba(37, 99, 235, 0.9);
+    }
+
+    .id-cell {
+      font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 11px;
+      color: #6b7280;
+      max-width: 180px;
+      overflow-wrap: anywhere;
+    }
+
+    .text-main {
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 7px;
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 500;
+      gap: 6px;
+    }
+
+    .badge-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #0f172a;
+    }
+
+    .badge-category {
+      background: rgba(37, 99, 235, 0.08);
+      color: #1d4ed8;
+    }
+
+    .badge-sentiment {
+      background: rgba(15, 23, 42, 0.04);
+      color: var(--text-sub);
+    }
+
+    .badge-sentiment.positive {
+      background: rgba(34, 197, 94, 0.08);
+      color: #15803d;
+    }
+
+    .badge-sentiment.negative {
+      background: rgba(248, 113, 113, 0.08);
+      color: #b91c1c;
+    }
+
+    .badge-sentiment.neutral {
+      background: rgba(148, 163, 184, 0.12);
+      color: #4b5563;
+    }
+
+    .score-pill {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 4px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      background: rgba(15, 23, 42, 0.03);
+      color: #0f172a;
+    }
+
+    .score-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      color: #6b7280;
+    }
+
+    .meta-row {
+      font-size: 10px;
+      color: #9ca3af;
+      margin-top: 4px;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 6px;
+      border-radius: 999px;
+      background: rgba(148, 163, 184, 0.12);
+      margin-right: 4px;
+    }
+
+    .tag-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: rgba(148, 163, 184, 0.9);
+    }
+
+    .empty-state {
+      padding: 18px;
+      text-align: center;
+      font-size: 12px;
+      color: var(--text-sub);
+    }
+
+    .refresh-info {
+      font-size: 11px;
+      color: #9ca3af;
+      margin-top: 6px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .pulse-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #22c55e;
+      box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.6);
+      animation: pulse 1.6s infinite;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(34,197,94,0.6); }
+      70% { transform: scale(1.5); box-shadow: 0 0 0 10px rgba(34,197,94,0); }
+      100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(34,197,94,0); }
+    }
+
+    /* ===== スマホ専用レイアウト調整 (admin) ===== */
+    @media (max-width: 768px) {
+      /* 全体コンテンツの余白をスマホ用に */
+      .app-shell {
+        max-width: 100%;
+        padding: 72px 10px 24px; /* ナビ高さを少し減らして見やすく */
+      }
+
+      /* ページ上部ヘッダー：縦並び＋少し小さめ */
+      header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        margin-bottom: 10px;
+      }
+
+      .brand-title {
+        font-size: 17px;
+      }
+
+      .brand-sub {
+        font-size: 11px;
+        max-width: 100%;
+        line-height: 1.5;
+      }
+
+      .header-actions {
+        width: 100%;
+        justify-content: flex-start;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .header-actions .btn {
+        font-size: 11px;
+        padding: 7px 11px;
+      }
+
+      /* 「住民の声（最新20件）」カードをコンパクトに */
+      .card {
+        padding: 12px 10px 16px;
+        border-radius: 14px;
+      }
+
+      .card-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+        margin-bottom: 8px;
+      }
+
+      .card-title {
+        font-size: 13px;
+      }
+
+      .card-sub {
+        font-size: 11px;
+        max-width: 100%;
+      }
+
+      .card-header .btn {
+        align-self: flex-start;
+        font-size: 11px;
+        padding: 6px 10px;
+      }
+
+      /* テーブルも少しだけ小さく */
+      .table-wrapper {
+        margin-top: 6px;
+        border-radius: 12px;
+      }
+
+      table {
+        font-size: 11px;
+      }
+
+      th,
+      td {
+        padding: 6px 4px;
+      }
+
+      /* スマホではID列は非表示（既存仕様維持） */
+      .id-col {
+        display: none;
+      }
+    }
+
+    /* ==== Kumano Compass 共通ナビバー ==================== */
+    .kc-nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 64px;
+      z-index: 1000;
+      padding: 0 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at top left,
+                  rgba(226, 239, 255, 0.95),
+                  rgba(255, 255, 255, 0.98));
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      box-shadow: 0 14px 30px rgba(15, 23, 42, 0.10);
+      border-bottom: 1px solid rgba(209, 213, 219, 0.7);
+    }
+
+    .kc-nav-inner {
+      width: 100%;
+      max-width: 1120px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .kc-nav-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+      cursor: pointer;
+      padding: 6px 0;
+      border: none;
+      background: transparent;
+    }
+
+    .kc-nav-logo-dot {
+      width: 24px;
+      height: 24px;
+      border-radius: 999px;
+      background: radial-gradient(circle at 30% 20%, #ffffff 0, #93c5fd 35%, #2563eb 100%);
+      box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.22);
+      animation: kc-nav-breath 3.2s ease-in-out infinite;
+    }
+
+    .kc-nav-logo-text {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .kc-nav-title {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+    }
+
+    .kc-nav-sub {
+      font-size: 11px;
+      color: #6b7280;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .kc-nav-center {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .kc-nav-link {
+      position: relative;
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-size: 12px;
+      color: #4b5563;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid rgba(148, 163, 184, 0.7); /* ← 枠線つける */
+      background: rgba(255, 255, 255, 0.9);
+      cursor: pointer;
+      transition:
+        background 0.18s ease-out,
+        color 0.18s ease-out,
+        transform 0.18s ease-out,
+        border-color 0.18s ease-out;
+    }
+
+    .kc-nav-link::after {
+      content: "";
+      position: absolute;
+      left: 14px;
+      right: 14px;
+      bottom: 4px;
+      height: 2px;
+      border-radius: 999px;
+      background: rgba(37, 99, 235, 0.9);
+      transform: scaleX(0);
+      transform-origin: center;
+      transition: transform 0.2s ease-out;
+    }
+
+    .kc-nav-link:hover {
+      background: rgba(239, 246, 255, 0.95);
+      border-color: rgba(59, 130, 246, 0.9); /* ホバー時に枠を少し濃く */
+      transform: translateY(-1px);
+    }
+
+    .kc-nav-link:hover::after {
+      transform: scaleX(1);
+    }
+
+    .kc-nav-link.active {
+      background: rgba(219, 234, 254, 0.95);
+      color: #1d4ed8;
+      border-color: rgba(37, 99, 235, 1); /* アクティブはしっかり青枠 */
+    }
+
+    .kc-nav-link.active::after {
+      transform: scaleX(1);
+    }
+
+    .kc-nav-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .kc-nav-pill {
+      font-size: 10px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(148, 163, 184, 0.12);
+      color: #6b7280;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .kc-nav-pill-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #22c55e;
+      box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.35);
+    }
+
+    /* コンテンツ押し下げ用（index/adminで使う） */
+    .kc-nav-spacer {
+      height: 72px;
+    }
+
+    /* アニメーション */
+
+    @keyframes kc-nav-slide-in {
+      from {
+        transform: translateY(-100%);
+        opacity: 0;
+      }
+      to {
+        transform: translateY(0%);
+        opacity: 1;
+      }
+    }
+
+    @keyframes kc-nav-breath {
+      0% {
+        transform: scale(1);
+        box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.22);
+      }
+      50% {
+        transform: scale(1.06);
+        box-shadow: 0 0 0 8px rgba(37, 99, 235, 0.0);
+      }
+      100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.22);
+      }
+    }
+
+    /* === 共通メニューバー：スマホ用レイアウト（視認性重視） === */
+    @media (max-width: 768px) {
+      .kc-nav {
+        height: 70px;
+        padding: 6px 10px;
+      }
+
+      .kc-nav-inner {
+        align-items: center;
+        gap: 6px;
+      }
+
+      .kc-nav-left {
+        gap: 6px;
+      }
+
+      .kc-nav-logo-dot {
+        width: 22px;
+        height: 22px;
+      }
+
+      .kc-nav-title {
+        font-size: 13px;
+        letter-spacing: 0.03em;
+      }
+
+      /* 説明文はスマホでは非表示にしてナビをスッキリ */
+      .kc-nav-sub {
+        display: none;
+      }
+
+      /* 中央タブ：3つを均等幅の大きなボタンにする */
+      .kc-nav-center {
+        flex: 1;
+        justify-content: space-between;
+        gap: 4px;
+      }
+
+      .kc-nav-link {
+        flex: 1;                     /* 3つで横幅を等分 */
+        justify-content: center;
+        padding: 8px 4px;
+        font-size: 11px;
+      }
+
+      /* これまで隠していたラベルもスマホで表示して視認性UP */
+      .kc-nav-link span:last-child {
+        display: inline;
+      }
+
+      /* ステータスピル（オンライン／Supabase連携中）は隠す */
+      .kc-nav-right .kc-nav-pill {
+        display: none;
+      }
+
+      /* mapページなどのCTAボタンは小さめに残す */
+      .kc-nav-right .kc-nav-cta {
+        padding: 6px 10px;
+        font-size: 11px;
+      }
+
+      /* コンテンツの押し下げ量も少し増やす */
+      .kc-nav-spacer {
+        height: 78px;
+      }
+    }
+
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <section class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">住民の声（最新20件）</div>
+          <div class="card-sub">AIが自動付与したカテゴリ・感情・重要度スコアをまとめて確認できます。</div>
+        </div>
+        <button class="btn" onclick="loadVoices(true)">
+          <span class="btn-icon">⟳</span>
+          再読み込み
+        </button>
+      </div>
+
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th class="id-col">ID</th>
+              <th>投稿内容</th>
+              <th>カテゴリ</th>
+              <th>感情</th>
+              <th>重要度スコア</th>
+            </tr>
+          </thead>
+          <tbody id="voices-table">
+            <tr>
+              <td colspan="5" class="empty-state">
+                データを読み込んでいます…
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="refresh-info">
+        <span class="pulse-dot"></span>
+        <span id="lastUpdatedText">更新時刻: 取得中…</span>
+      </div>
+    </section>
+  </div>
+    <div class="kc-nav">
+    <div class="kc-nav-inner">
+      <!-- 左ロゴ：クリックで入力画面へ -->
+      <button
+        class="kc-nav-left"
+        type="button"
+        onclick="window.location.href='/public/index.html'"
+      >
+        <div class="kc-nav-logo-dot"></div>
+        <div class="kc-nav-logo-text">
+          <div class="kc-nav-title">Kumano Compass</div>
+          <div class="kc-nav-sub">管理ダッシュボード</div>
+        </div>
+      </button>
+
+      <!-- 中央タブ（共通ナビ） -->
+      <div class="kc-nav-center">
+        <button
+          class="kc-nav-link"
+          type="button"
+          data-nav-href="/public/index.html"
+          data-nav-key="input"
+        >
+          <span>📝</span><span>入力</span>
+        </button>
+        <button
+          class="kc-nav-link"
+          type="button"
+          data-nav-href="/admin"
+          data-nav-key="admin"
+        >
+          <span>📊</span><span>一覧</span>
+        </button>
+        <button
+          class="kc-nav-link"
+          type="button"
+          data-nav-href="/admin/map"
+          data-nav-key="map"
+        >
+          <span>🗺</span><span>マップ</span>
+        </button>
+      </div>
+
+      <!-- 右側：ステータス表示 -->
+      <div class="kc-nav-right">
+        <div class="kc-nav-pill">
+          <span class="kc-nav-pill-dot"></span>
+          <span>Supabase 連携中</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // カテゴリごとの色（一部 map.html と揃えてもOK）
+    const CATEGORY_COLORS = {
+      "交通": "#e53935",
+      "医療": "#8e24aa",
+      "高齢化・福祉": "#3949ab",
+      "子育て・教育": "#1e88e5",
+      "観光": "#00897b",
+      "商店街・地域経済": "#43a047",
+      "自然環境": "#f59e0b",
+      "防災・津波": "#fb8c00",
+      "行政サービス": "#6d4c41",
+      "未分類": "#64748b",
+    };
+
+    function sentimentClass(sentiment) {
+      if (!sentiment) return "";
+      if (sentiment === "positive") return "positive";
+      if (sentiment === "negative") return "negative";
+      return "neutral";
+    }
+
+    function sentimentLabel(v) {
+      if (!v.sentiment) return "-";
+      const score = (v.sentiment_score ?? 0).toFixed(2);
+      if (v.sentiment === "positive") return `ポジティブ ${score}`;
+      if (v.sentiment === "negative") return `ネガティブ ${score}`;
+      return `ニュートラル ${score}`;
+    }
+
+    function formatImportance(v) {
+      if (typeof v.importance_score !== "number") return "-";
+      return v.importance_score.toFixed(2);
+    }
+
+    function formatMeta(v) {
+      const tags = [];
+      if (v.area) tags.push(`<span class="tag"><span class="tag-dot"></span>${v.area}</span>`);
+
+      // 種類（住民 / 学生 / 観光客）
+      if (v.source === "ivusa") {
+        tags.push('<span class="tag"><span class="tag-dot"></span>学生</span>');
+      } else if (v.source === "local") {
+        tags.push('<span class="tag"><span class="tag-dot"></span>地域の方々</span>');
+      } else if (v.source === "tourist") {
+        tags.push('<span class="tag"><span class="tag-dot"></span>観光客</span>');
+      }
+
+      // 追加属性（任意）
+      if (v.age) tags.push(`<span class="tag"><span class="tag-dot"></span>${v.age}</span>`);
+      if (v.gender) tags.push(`<span class="tag"><span class="tag-dot"></span>${v.gender}</span>`);
+      if (v.occupation) tags.push(`<span class="tag"><span class="tag-dot"></span>${v.occupation}</span>`);
+
+      return tags.join("");
+    }
+
+    async function loadVoices(isManual = false) {
+      const tbody = document.getElementById("voices-table");
+      if (!isManual) {
+        tbody.innerHTML = `<tr><td colspan="5" class="empty-state">データを読み込んでいます…</td></tr>`;
+      }
+
+      try {
+        const res = await fetch("/admin/api/voices");
+        if (!res.ok) {
+          throw new Error(await res.text());
+        }
+        const voices = await res.json();
+
+        if (!voices || voices.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="5" class="empty-state">まだデータがありません。現地で入力した内容がここに表示されます。</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = "";
+        voices.forEach((v) => {
+          const tr = document.createElement("tr");
+
+          const idCell = document.createElement("td");
+          idCell.className = "id-cell id-col";
+          idCell.textContent = v.id ?? "-";
+
+          const textCell = document.createElement("td");
+          textCell.innerHTML = `
+            <div class="text-main">${(v.raw_text ?? "").replace(/\n/g, "<br>")}</div>
+            <div class="meta-row">
+              ${formatMeta(v)}
+            </div>
+          `;
+
+          const categoryCell = document.createElement("td");
+          const catColor = CATEGORY_COLORS[v.category] || CATEGORY_COLORS["未分類"];
+          categoryCell.innerHTML = `
+            <span class="badge badge-category" style="border:1px solid ${catColor}33;">
+              <span class="badge-dot" style="background:${catColor};"></span>
+              ${v.category ?? "未分類"}
+            </span>
+          `;
+
+          const sentimentCell = document.createElement("td");
+          const sClass = sentimentClass(v.sentiment);
+          sentimentCell.innerHTML = `
+            <span class="badge badge-sentiment ${sClass}">
+              ${sentimentLabel(v)}
+            </span>
+          `;
+
+          const importanceCell = document.createElement("td");
+          importanceCell.innerHTML = `
+            <span class="score-pill">
+              <span class="score-label">IMP</span>
+              <span>${formatImportance(v)}</span>
+            </span>
+          `;
+
+          tr.appendChild(idCell);
+          tr.appendChild(textCell);
+          tr.appendChild(categoryCell);
+          tr.appendChild(sentimentCell);
+          tr.appendChild(importanceCell);
+
+          tbody.appendChild(tr);
+        });
+
+        // 更新時刻
+        const now = new Date();
+        document.getElementById("lastUpdatedText").textContent =
+          `更新時刻: ${now.toLocaleString("ja-JP")}`;
+      } catch (err) {
+        console.error(err);
+        tbody.innerHTML = `<tr><td colspan="5" class="empty-state">データ取得中にエラーが発生しました。</td></tr>`;
+      }
+    }
+
+    // 初回ロード
+    loadVoices();
+  </script>
+</body>
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const links = document.querySelectorAll(".kc-nav-link");
+    if (!links.length) return;
+
+    // 現在のパスを取得して末尾のスラッシュを削る（/admin/ → /admin）
+    const rawPath = window.location.pathname || "/";
+    const currentPath =
+      rawPath.length > 1 ? rawPath.replace(/\/+$/, "") : rawPath;
+
+    links.forEach((btn) => {
+      const href = btn.getAttribute("data-nav-href");
+      if (!href) return;
+
+      const hrefNorm =
+        href.length > 1 ? href.replace(/\/+$/, "") : href;
+
+      // 完全一致したときだけ active を付与
+      if (currentPath === hrefNorm) {
+        btn.classList.add("active");
+      }
+
+      btn.addEventListener("click", () => {
+        window.location.href = href;
+      });
+    });
+
+    // （モバイルメニューを後で入れたい場合用のフック）
+    const burger = document.querySelector(".kc-nav-burger");
+    const mobileMenu = document.querySelector(".kc-nav-mobile-menu");
+    if (burger && mobileMenu) {
+      burger.addEventListener("click", () => {
+        burger.classList.toggle("open");
+        mobileMenu.classList.toggle("open");
+      });
+
+      mobileMenu.querySelectorAll("[data-nav-href]").forEach((item) => {
+        item.addEventListener("click", () => {
+          const href = item.getAttribute("data-nav-href");
+          if (href) {
+            window.location.href = href;
+          }
+        });
+      });
+    }
+  });
+</script>
+</html>
