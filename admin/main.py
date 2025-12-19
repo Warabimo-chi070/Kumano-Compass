@@ -289,6 +289,9 @@ app.mount("/admin/static", StaticFiles(directory=BASE_DIR / "static"), name="sta
 PUBLIC_DIR = BASE_DIR.parent / "public"
 app.mount("/public", StaticFiles(directory=PUBLIC_DIR), name="public")
 
+@app.get("/")
+async def root():
+    return FileResponse(PUBLIC_DIR / "index.html")
 
 @app.get("/admin")
 async def admin_page():
