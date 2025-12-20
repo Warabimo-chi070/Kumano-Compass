@@ -1,2 +1,15 @@
 fastapi
+pydantic
 uvicorn[standard]
+openai
+supabase
+numpy
+torch
+transformers
+sentence-transformers
+keybert
+SudachiPy
+sudachidict_core
+fugashi
+ipadic
+sentencepiece
