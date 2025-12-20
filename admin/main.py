@@ -21,6 +21,9 @@ import os
 
 openai_client = OpenAI()  # OPENAI_API_KEY を環境変数から読む
 
+print("[ENV CHECK] SUPABASE_URL:", bool(os.getenv("SUPABASE_URL")))
+print("[ENV CHECK] SUPABASE_KEY:", bool(os.getenv("SUPABASE_KEY")))
+
 # ==========================
 #  Sudachi 設定
 # ==========================
