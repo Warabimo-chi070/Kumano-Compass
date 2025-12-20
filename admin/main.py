@@ -4,11 +4,6 @@ import uvicorn
 import re
 import unicodedata
 from sudachipy import tokenizer, dictionary
-from keybert import KeyBERT
-from sentence_transformers import SentenceTransformer, util
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
-import torch
-import torch.nn.functional as F
 import numpy as np
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -531,16 +526,54 @@ def get_voice_report(voice_id: str):
 # Hugging Face 上の 3 クラス（negative / neutral / positive）モデルを想定。
 SENTIMENT_MODEL = "koheiduck/bert-japanese-finetuned-sentiment"  # Sonoisa 系日本語感情モデル
 
-sentiment_tokenizer = AutoTokenizer.from_pretrained(SENTIMENT_MODEL)
-sentiment_model = AutoModelForSequenceClassification.from_pretrained(SENTIMENT_MODEL)
+# ==========================
+#  ローカルNLPのON/OFF（RenderではOFF推奨）
+# ==========================
+USE_LOCAL_NLP = os.getenv("USE_LOCAL_NLP", "0") == "1"  # Renderではデフォルト0推奨
 
-# モデルが持っている id2label をそのまま利用
-_raw_id2label = sentiment_model.config.id2label
+_LOCAL_MODELS = None  # キャッシュ
 
-# キーが str でも int でも動くように揃えておく
-SENTIMENT_ID2LABEL: Dict[int, str] = {
-    int(k): v for k, v in _raw_id2label.items()
-}
+def get_local_models():
+    """
+    重いモデル類は import 時にロードしない。
+    必要になった時だけロードしてキャッシュする。
+    """
+    global _LOCAL_MODELS
+
+    if not USE_LOCAL_NLP:
+        return None
+
+    if _LOCAL_MODELS is not None:
+        return _LOCAL_MODELS
+
+    # ここで初めて重いimport（Renderのポート検知を先に通すため）
+    from transformers import AutoTokenizer, AutoModelForSequenceClassification
+    from sentence_transformers import SentenceTransformer, util as st_util
+    from keybert import KeyBERT
+    import torch
+    import torch.nn.functional as F
+
+    sentiment_tokenizer = AutoTokenizer.from_pretrained(SENTIMENT_MODEL)
+    sentiment_model = AutoModelForSequenceClassification.from_pretrained(SENTIMENT_MODEL)
+
+    # id2label を揃える
+    raw_id2label = sentiment_model.config.id2label
+    sentiment_id2label = {int(k): v for k, v in raw_id2label.items()}
+
+    keyword_model = SentenceTransformer("sonoisa/sentence-bert-base-ja-mean-tokens-v2")
+    kw_model = KeyBERT(model=keyword_model)
+
+    _LOCAL_MODELS = {
+        "torch": torch,
+        "F": F,
+        "st_util": st_util,
+        "sentiment_tokenizer": sentiment_tokenizer,
+        "sentiment_model": sentiment_model,
+        "SENTIMENT_ID2LABEL": sentiment_id2label,
+        "keyword_model": keyword_model,
+        "kw_model": kw_model,
+    }
+    return _LOCAL_MODELS
 
 # ==========================
 #  KeyBERT / Sentence-BERT
@@ -573,56 +606,68 @@ class FeedbackPayload(BaseModel):
 # ==========================
 category_vectors: Dict[str, np.ndarray] = {}
 category_counts: Dict[str, int] = {}
+category_vectors[category] = center_vec
+category_counts[category] = 1
 
-for category, words in CATEGORY_RULES.items():
-    if not words:
-        continue
-    vecs = keyword_model.encode(words)
-    center_vec = np.mean(vecs, axis=0)
-    category_vectors[category] = center_vec
-    category_counts[category] = 1
+def ensure_category_centers():
+    """
+    カテゴリ中心ベクトルは必要になったタイミングで作る（起動を軽くする）。
+    """
+    global category_vectors, category_counts
+    if category_vectors:
+        return
+    models = get_local_models()
+    if models is None:
+        return
 
+    keyword_model = models["keyword_model"]
+
+    for category, words in CATEGORY_RULES.items():
+        if not words:
+            continue
+        vecs = keyword_model.encode(words)
+        center_vec = np.mean(vecs, axis=0)
+        category_vectors[category] = center_vec
+        category_counts[category] = 1
 
 def classify_category_by_semantic(keywords: list) -> str:
-    """
-    キーワード列からカテゴリを推定。
-    - ルールベース（CATEGORY_RULES の語がキーワードに含まれるか）
-    - 意味類似度（Sentence-BERT でカテゴリ中心ベクトルと比較）
-    を両方使ってスコアリングするハイブリッド方式。
-    """
     if not keywords:
         return "未分類"
 
-    # 事前計算されたカテゴリ中心ベクトルを使って意味類似度を計算
+    models = get_local_models()
+    if models is None:
+        # ローカルNLP OFF時はルールベースだけで判定（軽量）
+        for kw in keywords:
+            for category, words in CATEGORY_RULES.items():
+                if any(w in kw for w in words):
+                    return category
+        return "未分類"
+
+    ensure_category_centers()
+
+    keyword_model = models["keyword_model"]
+    st_util = models["st_util"]
+
     kw_vecs = keyword_model.encode(keywords)
 
-    # カテゴリごとのスコア初期化
     scores = {cat: 0.0 for cat in CATEGORY_RULES.keys()}
 
-    # ① ルールベース: キーワード中にカテゴリ辞書の単語が含まれていれば加点
     for kw in keywords:
         for category, words in CATEGORY_RULES.items():
             for w in words:
                 if w in kw:
-                    scores[category] += 1.0  # 直接ヒットはかなり重めに加点
+                    scores[category] += 1.0
 
-    # ② 意味類似度: Sentence-BERT でカテゴリ中心とのコサイン類似度を加点
     for kw_vec in kw_vecs:
         for category, cat_vec in category_vectors.items():
-            sim = util.cos_sim(kw_vec, cat_vec).item()
+            sim = st_util.cos_sim(kw_vec, cat_vec).item()
             if sim > 0:
-                scores[category] += sim  # 類似しているほどじわっと加点
+                scores[category] += sim
 
-    # 最もスコアの高いカテゴリを採用
     best_category = max(scores, key=scores.get)
-    best_score = scores[best_category]
-
-    # ぜんぶ低スコアなら「未分類」に逃がす
-    if best_score < 0.3:
+    if scores[best_category] < 0.3:
         return "未分類"
-
     return best_category
-
 
 def update_category_center(category: str, new_text: str, alpha: float = 0.85):
     global category_vectors, category_counts
@@ -729,10 +774,17 @@ def preprocess_text(text: str) -> str:
     cleaned = " ".join(important_words)
     return cleaned
 
-
 def extract_keywords(text: str):
     if not text or len(text) < 3:
         return []
+
+    models = get_local_models()
+    if models is None:
+        # ローカルNLP OFF時は簡易抽出（とりあえず動かす用）
+        return re.findall(r"[一-龥ぁ-んァ-ンA-Za-z0-9]{2,}", text)[:5]
+
+    kw_model = models["kw_model"]
+
     try:
         keywords = kw_model.extract_keywords(
             text,
@@ -748,16 +800,18 @@ def extract_keywords(text: str):
         return []
 
 def analyze_sentiment(cleaned_text: str, raw_text: Optional[str] = None):
-    """
-    koheiduck 日本語感情モデルを使って感情分類。
-    - sentiment: 'positive' / 'negative' / 'neutral' などの向き
-    - sentiment_score: 0〜1 の極性スコア
-        0.0   = 強いネガティブ
-        0.5   = 中立付近
-        1.0   = 強いポジティブ
-    """
     if not cleaned_text and not raw_text:
         return "neutral", 0.5
+
+    models = get_local_models()
+    if models is None:
+        return "neutral", 0.5
+
+    torch = models["torch"]
+    F = models["F"]
+    sentiment_tokenizer = models["sentiment_tokenizer"]
+    sentiment_model = models["sentiment_model"]
+    SENTIMENT_ID2LABEL = models["SENTIMENT_ID2LABEL"]
 
     text_for_model = cleaned_text or raw_text
 
@@ -776,19 +830,16 @@ def analyze_sentiment(cleaned_text: str, raw_text: Optional[str] = None):
     raw_label = SENTIMENT_ID2LABEL.get(max_idx, str(max_idx))
     sentiment = raw_label.lower()
 
-    # ラベル名 → インデックス
     label_to_idx = {v.lower(): k for k, v in SENTIMENT_ID2LABEL.items()}
     neg_idx = label_to_idx.get("negative") or label_to_idx.get("neg")
     pos_idx = label_to_idx.get("positive") or label_to_idx.get("pos")
 
-    # pos / neg の確率から極性スコアを作る
     if neg_idx is not None and pos_idx is not None and len(probs) >= 2:
         neg_p = float(probs[neg_idx])
         pos_p = float(probs[pos_idx])
-        polar = pos_p - neg_p          # -1（完全ネガ）〜 +1（完全ポジ）
-        sentiment_score = (polar + 1.0) / 2.0  # 0〜1 に正規化
+        polar = pos_p - neg_p
+        sentiment_score = (polar + 1.0) / 2.0
     else:
-        # pos / neg がはっきりないモデルの場合はラベルからざっくり決める
         if sentiment.startswith("neg"):
             sentiment_score = 0.0
         elif sentiment.startswith("pos"):
@@ -796,14 +847,12 @@ def analyze_sentiment(cleaned_text: str, raw_text: Optional[str] = None):
         else:
             sentiment_score = 0.5
 
-    # ネガティブ表現で補正
     if raw_text:
         sentiment, sentiment_score = adjust_sentiment_by_negative_words(
             sentiment, sentiment_score, raw_text
         )
 
-    # 0〜1 にクリップ
-    sentiment_score = float(max(0.0, min(sentiment_score, 1.0)))
+    sentiment_score = max(0.0, min(1.0, float(sentiment_score)))
     return sentiment, sentiment_score
 
 def estimate_urgency(text: str, sentiment: Optional[str] = None, sentiment_score: float = 0.5):
