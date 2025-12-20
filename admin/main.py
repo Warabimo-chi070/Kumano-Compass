@@ -15,9 +15,7 @@ from openai import OpenAI
 import os
 
 openai_client = OpenAI()  # OPENAI_API_KEY を環境変数から読む
-
-print("[ENV CHECK] SUPABASE_URL:", bool(os.getenv("SUPABASE_URL")))
-print("[ENV CHECK] SUPABASE_KEY:", bool(os.getenv("SUPABASE_KEY")))
+USE_LOCAL_NLP = os.getenv("USE_LOCAL_NLP", "0") == "1"
 
 # ==========================
 #  Sudachi 設定
@@ -560,20 +558,34 @@ def get_local_models():
     raw_id2label = sentiment_model.config.id2label
     sentiment_id2label = {int(k): v for k, v in raw_id2label.items()}
 
+if USE_LOCAL_NLP:
+    from sentence_transformers import SentenceTransformer, util
+    from keybert import KeyBERT
+    from transformers import AutoTokenizer, AutoModelForSequenceClassification
+    import torch
+    import torch.nn.functional as F
+
+    # ここに元々あった tokenizer/model 初期化を入れる
+    sentiment_tokenizer = AutoTokenizer.from_pretrained(SENTIMENT_MODEL)
+    sentiment_model = AutoModelForSequenceClassification.from_pretrained(SENTIMENT_MODEL)
+
+    # ここに元々あった id2label の整形があればそのまま
+    _raw_id2label = sentiment_model.config.id2label
+    SENTIMENT_ID2LABEL = {int(k): v for k, v in _raw_id2label.items()}
+
     keyword_model = SentenceTransformer("sonoisa/sentence-bert-base-ja-mean-tokens-v2")
     kw_model = KeyBERT(model=keyword_model)
 
-    _LOCAL_MODELS = {
-        "torch": torch,
-        "F": F,
-        "st_util": st_util,
-        "sentiment_tokenizer": sentiment_tokenizer,
-        "sentiment_model": sentiment_model,
-        "SENTIMENT_ID2LABEL": sentiment_id2label,
-        "keyword_model": keyword_model,
-        "kw_model": kw_model,
-    }
-    return _LOCAL_MODELS
+else:
+    # Render(512MB)では基本こっち。落ちないためのダミー
+    util = None
+    torch = None
+    F = None
+    sentiment_tokenizer = None
+    sentiment_model = None
+    SENTIMENT_ID2LABEL = {}
+    keyword_model = None
+    kw_model = None
 
 # ==========================
 #  KeyBERT / Sentence-BERT
@@ -625,6 +637,7 @@ def ensure_category_centers():
     for category, words in CATEGORY_RULES.items():
         if not words:
             continue
+        if USE_LOCAL_NLP:
         vecs = keyword_model.encode(words)
         center_vec = np.mean(vecs, axis=0)
         category_vectors[category] = center_vec
