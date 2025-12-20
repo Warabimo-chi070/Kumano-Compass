@@ -637,7 +637,6 @@ def ensure_category_centers():
     for category, words in CATEGORY_RULES.items():
         if not words:
             continue
-        if USE_LOCAL_NLP:
         vecs = keyword_model.encode(words)
         center_vec = np.mean(vecs, axis=0)
         category_vectors[category] = center_vec
