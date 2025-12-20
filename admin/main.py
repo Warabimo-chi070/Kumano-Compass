@@ -520,14 +520,14 @@ def get_voice_report(voice_id: str):
 # ==========================
 #  日本語感情分析モデル（Sonoisa 系 / v2 相当）
 # ==========================
-# 以前使っていた「Sonoisa の感情モデル」に近い構成に戻す。
 # Hugging Face 上の 3 クラス（negative / neutral / positive）モデルを想定。
-SENTIMENT_MODEL = "koheiduck/bert-japanese-finetuned-sentiment"  # Sonoisa 系日本語感情モデル
+SENTIMENT_MODEL = "koheiduck/bert-japanese-finetuned-sentiment"
 
 # ==========================
 #  ローカルNLPのON/OFF（RenderではOFF推奨）
 # ==========================
-USE_LOCAL_NLP = os.getenv("USE_LOCAL_NLP", "0") == "1"  # Renderではデフォルト0推奨
+# ※ファイル上部で USE_LOCAL_NLP を既に定義しているなら、ここはそのまま使われます
+# USE_LOCAL_NLP = os.getenv("USE_LOCAL_NLP", "0") == "1"
 
 _LOCAL_MODELS = None  # キャッシュ
 
@@ -535,6 +535,7 @@ def get_local_models():
     """
     重いモデル類は import 時にロードしない。
     必要になった時だけロードしてキャッシュする。
+    Render(512MB)で落ちる場合は USE_LOCAL_NLP=0 のまま運用する。
     """
     global _LOCAL_MODELS
 
@@ -544,19 +545,35 @@ def get_local_models():
     if _LOCAL_MODELS is not None:
         return _LOCAL_MODELS
 
-    # ここで初めて重いimport（Renderのポート検知を先に通すため）
+    # ここで初めて重いimport（起動/ポート検知を先に通す）
     from transformers import AutoTokenizer, AutoModelForSequenceClassification
     from sentence_transformers import SentenceTransformer, util as st_util
     from keybert import KeyBERT
     import torch
     import torch.nn.functional as F
 
+    # 感情モデル
     sentiment_tokenizer = AutoTokenizer.from_pretrained(SENTIMENT_MODEL)
     sentiment_model = AutoModelForSequenceClassification.from_pretrained(SENTIMENT_MODEL)
 
-    # id2label を揃える
-    raw_id2label = sentiment_model.config.id2label
-    sentiment_id2label = {int(k): v for k, v in raw_id2label.items()}
+    raw_id2label = sentiment_model.config.id2label or {}
+    SENTIMENT_ID2LABEL = {int(k): v for k, v in raw_id2label.items()}
+
+    # Keyword / 埋め込み
+    keyword_model = SentenceTransformer("sonoisa/sentence-bert-base-ja-mean-tokens-v2")
+    kw_model = KeyBERT(model=keyword_model)
+
+    _LOCAL_MODELS = {
+        "torch": torch,
+        "F": F,
+        "st_util": st_util,
+        "sentiment_tokenizer": sentiment_tokenizer,
+        "sentiment_model": sentiment_model,
+        "SENTIMENT_ID2LABEL": SENTIMENT_ID2LABEL,
+        "keyword_model": keyword_model,
+        "kw_model": kw_model,
+    }
+    return _LOCAL_MODELS
 
 if USE_LOCAL_NLP:
     from sentence_transformers import SentenceTransformer, util
@@ -573,9 +590,6 @@ if USE_LOCAL_NLP:
     _raw_id2label = sentiment_model.config.id2label
     SENTIMENT_ID2LABEL = {int(k): v for k, v in _raw_id2label.items()}
 
-    keyword_model = SentenceTransformer("sonoisa/sentence-bert-base-ja-mean-tokens-v2")
-    kw_model = KeyBERT(model=keyword_model)
-
 else:
     # Render(512MB)では基本こっち。落ちないためのダミー
     util = None
@@ -586,12 +600,6 @@ else:
     SENTIMENT_ID2LABEL = {}
     keyword_model = None
     kw_model = None
-
-# ==========================
-#  KeyBERT / Sentence-BERT
-# ==========================
-keyword_model = SentenceTransformer("sonoisa/sentence-bert-base-ja-mean-tokens-v2")
-kw_model = KeyBERT(model=keyword_model)
 
 # ==========================
 #  リクエストモデル
@@ -618,8 +626,6 @@ class FeedbackPayload(BaseModel):
 # ==========================
 category_vectors: Dict[str, np.ndarray] = {}
 category_counts: Dict[str, int] = {}
-category_vectors[category] = center_vec
-category_counts[category] = 1
 
 def ensure_category_centers():
     """
@@ -683,12 +689,26 @@ def classify_category_by_semantic(keywords: list) -> str:
 
 def update_category_center(category: str, new_text: str, alpha: float = 0.85):
     global category_vectors, category_counts
+
+    models = get_local_models()
+    if models is None:
+        # Render等で USE_LOCAL_NLP=0 の場合は学習更新をスキップ
+        return
+
+    ensure_category_centers()
+
+    if category not in category_vectors:
+        # 未知カテゴリは無視（安全側）
+        return
+
+    keyword_model = models["keyword_model"]
+
     new_vec = keyword_model.encode([new_text])[0]
     old_vec = category_vectors[category]
+
     updated_vec = alpha * old_vec + (1 - alpha) * new_vec
     category_vectors[category] = updated_vec
-    category_counts[category] += 1
-
+    category_counts[category] = category_counts.get(category, 0) + 1
 
 # ==========================
 #  メイン解析エンドポイント
