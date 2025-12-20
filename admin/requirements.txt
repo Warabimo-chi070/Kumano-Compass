@@ -6,7 +6,7 @@ supabase
 numpy
 torch
 transformers
-sentence-transformers
+SentenceTransformer
 keybert
 SudachiPy
 sudachidict_core
