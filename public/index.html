@@ -1034,6 +1034,7 @@
 
   </style>
 </head>
+<body>
 <script>
   document.addEventListener("DOMContentLoaded", function () {
     const links = document.querySelectorAll(".kc-nav-link");
@@ -1051,26 +1052,18 @@
       const hrefNorm =
         href.length > 1 ? href.replace(/\/+$/, "") : href;
 
-      // 完全一致したときだけ active を付与
-      if (currentPath === hrefNorm) {
-        btn.classList.add("active");
-      }
+      // 現在のページと一致するボタンをアクティブに
+      if (hrefNorm === currentPath) btn.classList.add("active");
 
       btn.addEventListener("click", () => {
         window.location.href = href;
       });
     });
 
-    // （モバイルメニューを後で入れたい場合用のフック）
-    const burger = document.querySelector(".kc-nav-burger");
-    const mobileMenu = document.querySelector(".kc-nav-mobile-menu");
-    if (burger && mobileMenu) {
-      burger.addEventListener("click", () => {
-        burger.classList.toggle("open");
-        mobileMenu.classList.toggle("open");
-      });
-
-      mobileMenu.querySelectorAll("[data-nav-href]").forEach((item) => {
+    // メニュー項目（サイドバーなど）
+    const items = document.querySelectorAll(".kc-nav-item");
+    if (items.length) {
+      items.forEach((item) => {
         item.addEventListener("click", () => {
           const href = item.getAttribute("data-nav-href");
           if (href) {
@@ -1081,10 +1074,9 @@
     }
   });
 </script>
-<body>
-  <body>
-  <!-- 共通ナビバー -->
-  <div class="kc-nav">
+
+<!-- 共通ナビバー -->
+ <div class="kc-nav">
     <div class="kc-nav-inner">
       <!-- 左ロゴ：入力画面トップに戻る -->
       <button
@@ -1376,14 +1368,14 @@
           </div>
 
           <div class="button-row">
-            <button id="recordBtn-mobile" class="btn btn-secondary">
+            <button id="recordBtn-mobile" class="btn btn-secondary" type="button">
               <span class="btn-icon-circle">
                 <span id="micDot-mobile">🎙</span>
               </span>
               <span class="btn-label" id="recordLabel-mobile">音声入力を開始</span>
             </button>
 
-            <button id="sendBtn-mobile" class="btn btn-primary">
+            <button id="sendBtn-mobile" class="btn btn-primary" type="button">
               <span class="spinner"></span>
               <span class="btn-label">AI解析して保存</span>
             </button>
@@ -1704,9 +1696,18 @@
       sendBtn.addEventListener("click", async () => {
         if (isSending) return;
 
-        const area = document.getElementById("area-mobile").value;
-        const source = document.getElementById("source-mobile").value;
-        const text = textOutput.value.trim();
+        const areaEl = document.getElementById("area-mobile");
+        const sourceEl = document.getElementById("source-mobile");
+
+        // DOMが壊れてる / 読み込みが不完全な時に落ちないようにガード
+        if (!textOutput || !charCountEl || !sendBtn || !areaEl || !sourceEl) {
+          alert("画面の読み込みが不完全です。ページを再読み込みしてください。");
+          return;
+        }
+
+        const area = areaEl.value || null;
+        const source = sourceEl.value || null;
+        const text = (textOutput.value || "").trim();
 
         if (!text) {
           showToast("内容が空です", true);
@@ -1721,32 +1722,37 @@
           text,
           area,
           source,
-          age,
-          gender,
-          occupation,
           lat: currentLat,
           lng: currentLng,
         };
 
+        const apiUrl = new URL("/analyze", window.location.origin).toString();
+
         try {
-          const res = await fetch("/analyze", {
+          const res = await fetch(apiUrl, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
           });
 
+          const bodyText = await res.text();
+
           if (!res.ok) {
-            console.error("API Error", res.status, await res.text());
-            showToast("AI解析 or 保存に失敗しました", true);
-          } else {
-            await res.json();
-            showToast("送信が完了しました ✅");
-            textOutput.value = "";
-            charCountEl.textContent = "0";
+            console.error("API Error", res.status, bodyText);
+            // スマホでも原因が見えるように、ステータスを表示
+            showToast(`送信失敗 (${res.status})：${bodyText.slice(0, 120)}`, true);
+            return;
           }
+
+          // 成功時：JSONの可能性が高いが、念のためtry
+          try { JSON.parse(bodyText); } catch (_) {}
+
+          showToast("送信が完了しました ✅");
+          textOutput.value = "";
+          charCountEl.textContent = "0";
         } catch (err) {
           console.error(err);
-          showToast("通信エラーが発生しました", true);
+          showToast(`通信エラー：${String(err).slice(0, 120)}`, true);
         } finally {
           isSending = false;
           sendBtn.classList.remove("loading");
@@ -1768,6 +1774,6 @@
       initGeolocation();
       initSpeech();
     })();
-  </script>
-<body>
+    </script>
+  </body>
 </html>
