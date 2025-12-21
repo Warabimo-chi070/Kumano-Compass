@@ -2,6 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Kumano Compass - 課題マップ</title>
 
   <!-- Leaflet -->
@@ -698,6 +699,99 @@
       }
     }
     
+    /* =========================
+    Mobile UX Patch (Map + Report)
+    ========================= */
+
+  html { -webkit-text-size-adjust: 100%; }
+
+  /* ボトムシート全体を“ドラッグ/タップで縮小⇄拡大”できるようにする */
+  .summary-panel {
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - 72px);
+  }
+
+  /* iPhoneのホームバー分の余白 */
+  .summary-panel-wrapper {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* レポート本文（整形HTML） */
+  .summary-body {
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 12px 16px 18px;
+    line-height: 1.75;
+    font-size: 15px;
+  }
+
+  /* “縮小表示”のときは本文を隠して、プレビューだけ見せる */
+  .summary-preview {
+    display: none;
+    padding: 10px 16px 14px;
+    border-top: 1px solid rgba(226, 232, 240, 0.9);
+    color: #475569;
+    font-size: 13px;
+    line-height: 1.45;
+  }
+
+  .summary-preview-hint {
+    margin-top: 6px;
+    font-size: 12px;
+    color: #64748b;
+  }
+
+  .summary-panel.peek .summary-body {
+    display: none;
+  }
+
+  .summary-panel.peek .summary-preview {
+    display: block;
+  }
+
+  /* 縮小状態：ヘッダーだけ残して下に退避（地図を広く） */
+  .summary-panel.visible.peek {
+    transform: translateY(calc(100% - 104px - env(safe-area-inset-bottom)));
+    opacity: 1;
+  }
+
+  /* レポート整形（見出し/箇条書き） */
+  .report h3 {
+    font-size: 15px;
+    margin: 12px 0 6px;
+    padding-top: 4px;
+  }
+
+  .report p {
+    margin: 6px 0;
+  }
+
+  .report ul {
+    margin: 6px 0 10px;
+    padding-left: 18px;
+  }
+
+  .report li {
+    margin: 4px 0;
+  }
+
+  .report .report-error {
+    color: #b91c1c;
+    background: rgba(254, 226, 226, 0.7);
+    border: 1px solid rgba(252, 165, 165, 0.9);
+    padding: 10px 12px;
+    border-radius: 10px;
+    line-height: 1.55;
+  }
+
+  /* スマホはタイトル周りも少し大きく */
+  @media (max-width: 768px) {
+    .summary-title { font-size: 15px; }
+    .summary-subtitle { font-size: 12px; }
+    .summary-body { font-size: 15px; }
+    .leaflet-popup-content { font-size: 14px; line-height: 1.55; }
+  }
   </style>
 </head>
 <script>
@@ -1039,32 +1133,153 @@
       legend.addTo(map);
     }
 
-    // ----------------------------
-    //  AIレポート用サマリーパネル制御
-    // ----------------------------
-    const summaryPanel = document.getElementById("summary-panel");
-    const summaryBody = document.getElementById("summary-body");
-    const summaryTitleText = document.getElementById("summary-title-text");
-    const summaryIcon = document.getElementById("summary-icon");
-    const summaryChip = document.getElementById("summary-chip");
-    const summarySubtitle = document.getElementById("summary-subtitle");
+  // ----------------------------
+  //  AIレポート用サマリーパネル制御（Mobile最適化）
+  // ----------------------------
+  const summaryPanel = document.getElementById("summary-panel");
+  const summaryBody = document.getElementById("summary-body");
+  const summaryTitleText = document.getElementById("summary-title-text");
+  const summaryIcon = document.getElementById("summary-icon");
+  const summaryChip = document.getElementById("summary-chip");
+  const summarySubtitle = document.getElementById("summary-subtitle");
 
-    function showSummaryPanel() {
-      summaryPanel.classList.add("visible");
+  let summaryState = "hidden"; // "hidden" | "full" | "peek"
+
+  // プレビュー領域をJSで追加（HTMLをいじらなくてOK）
+  const previewEl = document.createElement("div");
+  previewEl.id = "summary-preview";
+  previewEl.className = "summary-preview";
+  previewEl.innerHTML = `
+    <div id="summary-preview-text"></div>
+    <div class="summary-preview-hint">↑ タップで拡大 / ✕で閉じる</div>
+  `;
+  summaryBody.parentNode.insertBefore(previewEl, summaryBody);
+  const previewTextEl = document.getElementById("summary-preview-text");
+
+  // ヘッダーに「縮小/拡大」ボタンを追加
+  const closeBtn = summaryPanel.querySelector(".summary-close-btn");
+  const minBtn = document.createElement("button");
+  minBtn.type = "button";
+  minBtn.className = "summary-close-btn";
+  minBtn.title = "縮小/拡大";
+  minBtn.style.marginRight = "8px";
+  minBtn.textContent = "▾";
+  closeBtn.parentNode.insertBefore(minBtn, closeBtn);
+
+  function setSummaryState(next) {
+    summaryState = next;
+
+    summaryPanel.classList.toggle("visible", next !== "hidden");
+    summaryPanel.classList.toggle("peek", next === "peek");
+    summaryPanel.classList.toggle("full", next === "full");
+
+    // ボタン表示（縮小時は▴、拡大時は▾）
+    if (next === "peek") minBtn.textContent = "▴";
+    if (next === "full") minBtn.textContent = "▾";
+  }
+
+  function showSummaryPanel(mode = "full") {
+    setSummaryState(mode);
+  }
+
+  function hideSummaryPanel() {
+    setSummaryState("hidden");
+  }
+
+  // タップで縮小/拡大
+  function toggleSummaryPanelSize() {
+    if (summaryState === "full") setSummaryState("peek");
+    else if (summaryState === "peek") setSummaryState("full");
+    else setSummaryState("full");
+  }
+
+  minBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    toggleSummaryPanelSize();
+  });
+
+  // ハンドルもタップで縮小/拡大
+  const handleEl = summaryPanel.querySelector(".summary-handle");
+  if (handleEl) {
+    handleEl.addEventListener("click", (e) => {
+      e.preventDefault();
+      toggleSummaryPanelSize();
+    });
+  }
+
+  // レポート表示を「読みやすいHTML」に整形
+  function escapeHtml(s) {
+    return String(s)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#39;");
+  }
+
+  function formatReportTextToHtml(text) {
+    const lines = String(text || "").split(/\r?\n/);
+    let html = `<div class="report">`;
+    let inList = false;
+
+    for (const raw of lines) {
+      const line = raw.trimEnd();
+      if (!line.trim()) {
+        if (inList) { html += `</ul>`; inList = false; }
+        continue;
+      }
+
+      // 見出し： "1." "2)" "3、" など
+      if (/^\d+\s*[\.\)\、]/.test(line)) {
+        if (inList) { html += `</ul>`; inList = false; }
+        html += `<h3>${escapeHtml(line)}</h3>`;
+        continue;
+      }
+
+      // 箇条書き： "- " "・" "•"
+      if (/^(\-|\・|\•)\s*/.test(line)) {
+        if (!inList) { html += `<ul>`; inList = true; }
+        html += `<li>${escapeHtml(line.replace(/^(\-|\・|\•)\s*/, ""))}</li>`;
+        continue;
+      }
+
+      // 通常文
+      if (inList) { html += `</ul>`; inList = false; }
+      html += `<p>${escapeHtml(line)}</p>`;
     }
 
-    function hideSummaryPanel() {
-      summaryPanel.classList.remove("visible");
-    }
+    if (inList) html += `</ul>`;
+    html += `</div>`;
+    return html;
+  }
 
-    function showLoading(text = "AIが分析しています…") {
-      summaryBody.innerHTML = `
-        <div class="summary-loading">
-          <div class="spinner"></div>
-          <span>${text}</span>
-        </div>
-      `;
-    }
+  function setReportText(text) {
+    const t = text ?? "";
+    summaryBody.innerHTML = formatReportTextToHtml(t);
+
+    // プレビュー（最初の2〜3行を抽出）
+    const pick = String(t).split(/\r?\n/).map(s => s.trim()).filter(Boolean).slice(0, 3);
+    previewTextEl.textContent = pick.join(" / ") || "レポートがありません。";
+
+    // 先頭へ
+    summaryBody.scrollTop = 0;
+  }
+
+  function setErrorText(message) {
+    summaryBody.innerHTML = `<div class="report report-error">${escapeHtml(message)}</div>`;
+    previewTextEl.textContent = "エラーが発生しました。";
+    summaryBody.scrollTop = 0;
+  }
+
+  function showLoading(text = "AIが分析しています…") {
+    summaryBody.innerHTML = `
+      <div class="summary-loading">
+        <div class="spinner"></div>
+        <span>${escapeHtml(text)}</span>
+      </div>
+    `;
+    previewTextEl.textContent = "AIが分析中です…";
+  }
 
     // ----------------------------
     //  全体AIレポート取得
@@ -1088,7 +1303,7 @@
           return;
         }
         const data = await res.json();
-        summaryBody.textContent = data.text ?? "レポートを取得できませんでした。";
+       setReportText(data.text ?? "レポートを取得できませんでした。");
       } catch (e) {
         console.error(e);
         summaryBody.textContent = "レポート取得中にエラーが発生しました。";
