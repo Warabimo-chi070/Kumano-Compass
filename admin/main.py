@@ -832,20 +832,24 @@ def extract_keywords(text: str):
         return []
 
 def analyze_sentiment(cleaned_text: str, raw_text: Optional[str] = None):
+    """
+    koheiduck 日本語感情モデルを使って感情分類。
+    - sentiment: 'positive' / 'negative' / 'neutral'
+    - sentiment_score: 0〜1 の極性スコア
+        0.0   = 強いネガティブ
+        0.5   = 中立付近
+        1.0   = 強いポジティブ
+
+    重要: 感情は「生の文（raw_text）」を優先して推定する。
+    cleaned_text（名詞など抽出後の語列）は、感情ニュアンスが落ちやすい。
+    """
     if not cleaned_text and not raw_text:
         return "neutral", 0.5
 
-    models = get_local_models()
-    if models is None:
-        return "neutral", 0.5
-
-    torch = models["torch"]
-    F = models["F"]
-    sentiment_tokenizer = models["sentiment_tokenizer"]
-    sentiment_model = models["sentiment_model"]
-    SENTIMENT_ID2LABEL = models["SENTIMENT_ID2LABEL"]
-
-    text_for_model = cleaned_text or raw_text
+    # ★ここが本質：raw_text を優先（なければ cleaned_text）
+    text_for_model = (raw_text or "").strip()
+    if not text_for_model:
+        text_for_model = (cleaned_text or "").strip()
 
     inputs = sentiment_tokenizer(
         text_for_model,
@@ -862,16 +866,19 @@ def analyze_sentiment(cleaned_text: str, raw_text: Optional[str] = None):
     raw_label = SENTIMENT_ID2LABEL.get(max_idx, str(max_idx))
     sentiment = raw_label.lower()
 
+    # ラベル名 → インデックス
     label_to_idx = {v.lower(): k for k, v in SENTIMENT_ID2LABEL.items()}
     neg_idx = label_to_idx.get("negative") or label_to_idx.get("neg")
     pos_idx = label_to_idx.get("positive") or label_to_idx.get("pos")
 
+    # pos / neg の確率から極性スコアを作る
     if neg_idx is not None and pos_idx is not None and len(probs) >= 2:
         neg_p = float(probs[neg_idx])
         pos_p = float(probs[pos_idx])
-        polar = pos_p - neg_p
-        sentiment_score = (polar + 1.0) / 2.0
+        polar = pos_p - neg_p                 # -1（完全ネガ）〜 +1（完全ポジ）
+        sentiment_score = (polar + 1.0) / 2.0 # 0〜1 に正規化
     else:
+        # pos / neg がはっきりないモデルの場合はラベルからざっくり決める
         if sentiment.startswith("neg"):
             sentiment_score = 0.0
         elif sentiment.startswith("pos"):
@@ -879,12 +886,13 @@ def analyze_sentiment(cleaned_text: str, raw_text: Optional[str] = None):
         else:
             sentiment_score = 0.5
 
+    # ネガ/ポジ表現・「けど」構文で補正（raw_text があればそれで補正）
     if raw_text:
         sentiment, sentiment_score = adjust_sentiment_by_negative_words(
             sentiment, sentiment_score, raw_text
         )
 
-    sentiment_score = max(0.0, min(1.0, float(sentiment_score)))
+    sentiment_score = float(max(0.0, min(sentiment_score, 1.0)))
     return sentiment, sentiment_score
 
 def estimate_urgency(text: str, sentiment: Optional[str] = None, sentiment_score: float = 0.5):
