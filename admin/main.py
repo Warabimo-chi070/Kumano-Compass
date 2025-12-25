@@ -149,40 +149,50 @@ def generate_with_llm(core_prompt: str, max_output_tokens: int = 800) -> str:
 # ==========================
 CATEGORY_RULES = {
     "交通": [
-        "バス", "本数", "減便", "乗り合い", "デマンド",
+        "バス", "本数", "減便", "乗り合い", "デマンド", "コミュニティバス",
+        "タクシー", "送迎", "ライドシェア",
         "道路", "渋滞", "危険", "交通", "インフラ", "移動",
+        "通勤", "通学", "駅", "電車", "免許", "運転",
     ],
     "医療": [
-        "病院", "診療所", "医者", "救急", "薬局",
-        "通院", "医療", "往診",
+        "病院", "診療所", "医者", "救急", "救命", "薬局",
+        "通院", "医療", "往診", "健診", "検診", "産婦人科",
     ],
     "高齢化・福祉": [
         "高齢", "年寄り", "介護", "独居", "見守り",
-        "買い物弱者", "福祉", "老人", "要支援",
+        "買い物弱者", "福祉", "老人", "要支援", "要介護",
+        "免許返納", "認知症",
     ],
     "子育て・教育": [
-        "保育園", "幼稚園", "小学校", "中学校", "高校",
-        "子ども", "児童", "生徒", "部活", "遊び場",
+        "保育園", "幼稚園", "認定こども園", "小学校", "中学校", "高校",
+        "学童", "放課後", "子ども", "児童", "生徒", "保護者",
+        "育児", "子育て", "教育", "先生", "部活", "遊び場",
+        "奨学金", "進学", "通学",
     ],
     "観光": [
         "観光", "滞在", "宿泊", "民泊", "旅行",
-        "花火", "祭り", "虫送り", "ホタル", "景勝地", "名所",
+        "花火", "祭り", "イベント", "虫送り", "ホタル", "景勝地", "名所",
+        "温泉", "世界遺産", "熊野古道",
+        "インバウンド",
     ],
     "商店街・地域経済": [
-        "商店街", "店", "買い物", "空き店舗", "雇用",
-        "仕事", "地元企業", "経済", "産業",
+        "商店街", "店", "お店", "スーパー", "コンビニ", "飲食店", "買い物",
+        "空き店舗", "空き家", "雇用", "求人",
+        "仕事", "職", "地元企業", "経済", "産業", "商業",
+        "賃金", "給料", "給与", "収入", "物価", "後継者", "担い手",
     ],
     "自然環境": [
         "海", "川", "山", "森", "自然", "生態系",
-        "景観", "環境", "動植物",
+        "景観", "環境", "動植物", "ごみ", "清掃", "海岸", "森林",
     ],
     "防災・津波": [
         "津波", "南海トラフ", "避難", "洪水", "浸水",
-        "災害", "危険箇所", "ハザード", "地震",
+        "災害", "危険箇所", "ハザード", "地震", "土砂", "土砂災害",
+        "避難所", "防災",
     ],
     "行政サービス": [
         "市役所", "行政", "制度", "申請", "広報",
-        "サービス", "支援", "相談",
+        "サービス", "支援", "相談", "補助金", "助成金", "手続き",
     ],
 }
 
@@ -279,6 +289,82 @@ def adjust_sentiment_by_negative_words(sentiment: str, sentiment_score: float, r
 #  FastAPI 基本設定
 # ==========================
 app = FastAPI()
+
+# ==========================
+#  既存データの再分析（全件/1件）
+# ==========================
+
+def compute_analysis(text: str):
+    cleaned = preprocess_text(text)
+    keywords = extract_keywords(raw_text=text, cleaned_text=cleaned, top_n=7)  
+    category = classify_category_by_semantic(keywords, raw_text=text)         
+    sentiment, sentiment_score = analyze_sentiment(cleaned_text=cleaned, raw_text=text)
+    urgency = estimate_urgency(text, sentiment, sentiment_score)
+    topic, topic_id = simple_topic(cleaned)
+    importance = calc_importance(sentiment_score, urgency)
+
+    return {
+        "category": category,
+        "sentiment": sentiment,
+        "sentiment_score": sentiment_score,
+        "urgency": urgency,
+        "topic": topic,
+        "topic_id": topic_id,
+        "important_score": importance,
+    }
+
+@app.post("/admin/api/reanalyze/voice/{voice_id}")
+def reanalyze_one(voice_id: str):
+    # 1件取得
+    resp = supabase.table("voices").select("id, raw_text").eq("id", voice_id).limit(1).execute()
+    rows = resp.data or []
+    if not rows:
+        return {"ok": False, "error": "not found"}
+
+    raw_text = rows[0].get("raw_text") or ""
+    new_fields = compute_analysis(raw_text)
+
+    # 更新
+    upd = supabase.table("voices").update(new_fields).eq("id", voice_id).execute()
+    return {"ok": True, "updated": upd.data}
+
+@app.post("/admin/api/reanalyze/all")
+def reanalyze_all(limit_total: int = 2000, batch_size: int = 200):
+    """
+    既存 voices を最大 limit_total 件まで再分析して UPDATE。
+    - batch_size は 100〜300 くらいが無難
+    """
+    updated = 0
+    offset = 0
+    errors = []
+
+    while updated < limit_total:
+        # range は supabase-py でよく使う取得方法（0-index）
+        batch = supabase.table("voices") \
+            .select("id, raw_text") \
+            .order("created_at", desc=False) \
+            .range(offset, offset + batch_size - 1) \
+            .execute()
+
+        rows = batch.data or []
+        if not rows:
+            break
+
+        for r in rows:
+            try:
+                vid = r["id"]
+                raw_text = r.get("raw_text") or ""
+                new_fields = compute_analysis(raw_text)
+                supabase.table("voices").update(new_fields).eq("id", vid).execute()
+                updated += 1
+                if updated >= limit_total:
+                    break
+            except Exception as e:
+                errors.append({"id": r.get("id"), "error": str(e)})
+
+        offset += batch_size
+
+    return {"ok": True, "updated_count": updated, "errors": errors[:20], "error_count": len(errors)}
 
 # 静的ファイル
 app.mount("/admin/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
@@ -648,43 +734,61 @@ def ensure_category_centers():
         category_vectors[category] = center_vec
         category_counts[category] = 1
 
-def classify_category_by_semantic(keywords: list) -> str:
-    if not keywords:
+def classify_category_by_semantic(keywords: list, raw_text: Optional[str] = None) -> str:
+    """
+    改良版：
+    - keywords だけでなく raw_text（本文）もルールマッチに使う
+    - ルールである程度当たるなら未分類に落とさない
+    - 意味類似度は補助として使う
+    """
+    raw = unicodedata.normalize("NFKC", (raw_text or ""))
+    keywords = [k for k in (keywords or []) if k]
+
+    if not keywords and not raw:
         return "未分類"
 
-    models = get_local_models()
-    if models is None:
-        # ローカルNLP OFF時はルールベースだけで判定（軽量）
-        for kw in keywords:
-            for category, words in CATEGORY_RULES.items():
-                if any(w in kw for w in words):
-                    return category
-        return "未分類"
-
-    ensure_category_centers()
-
-    keyword_model = models["keyword_model"]
-    st_util = models["st_util"]
-
-    kw_vecs = keyword_model.encode(keywords)
-
+    # スコア初期化
     scores = {cat: 0.0 for cat in CATEGORY_RULES.keys()}
 
-    for kw in keywords:
-        for category, words in CATEGORY_RULES.items():
+    # ① ルールベース（強め）：本文に出てきたら +2、keywords に出てきたら +1
+    for category, words in CATEGORY_RULES.items():
+        for w in words:
+            if raw and w in raw:
+                scores[category] += 2.0
+        for kw in keywords:
             for w in words:
                 if w in kw:
                     scores[category] += 1.0
 
-    for kw_vec in kw_vecs:
-        for category, cat_vec in category_vectors.items():
-            sim = st_util.cos_sim(kw_vec, cat_vec).item()
-            if sim > 0:
-                scores[category] += sim
+    # ルールヒットがあるなら、ここで決め切る（未分類に落としにくくする）
+    best_rule_cat = max(scores, key=scores.get)
+    best_rule_score = scores[best_rule_cat]
+    rule_hit = best_rule_score >= 2.0  # 本文ヒットが1個でもあるイメージ
+
+    # ② 意味類似度（補助）：keywords がある場合のみ
+    if keywords:
+        try:
+            kw_vecs = keyword_model.encode(keywords)
+            for kw_vec in kw_vecs:
+                for category, cat_vec in category_vectors.items():
+                    sim = util.cos_sim(kw_vec, cat_vec).item()
+                    if sim > 0:
+                        scores[category] += 0.8 * sim
+        except Exception as e:
+            print("Semantic similarity error:", e)
 
     best_category = max(scores, key=scores.get)
-    if scores[best_category] < 0.3:
+    best_score = scores[best_category]
+
+    # ルールで当たってるなら未分類に落とさない
+    if rule_hit:
+        return best_rule_cat
+
+    # ルール弱い + 意味類似も弱い → 未分類
+    # （ここを下げるほど未分類は減るが誤分類は増える。まずは 0.18 推奨）
+    if best_score < 0.18:
         return "未分類"
+
     return best_category
 
 def update_category_center(category: str, new_text: str, alpha: float = 0.85):
@@ -717,10 +821,10 @@ def update_category_center(category: str, new_text: str, alpha: float = 0.85):
 async def analyze(payload: TextPayload):
     text = payload.text
     nlp_id = str(uuid.uuid4())
-
     cleaned = preprocess_text(text)
-    keywords = extract_keywords(cleaned)
-    category = classify_category_by_semantic(keywords)
+
+    keywords = extract_keywords(raw_text=text, cleaned_text=cleaned, top_n=7)
+    category = classify_category_by_semantic(keywords, raw_text=text)
     sentiment, sentiment_score = analyze_sentiment(cleaned_text=cleaned, raw_text=text)
     urgency = estimate_urgency(text, sentiment, sentiment_score)
     topic, topic_id = simple_topic(cleaned)
@@ -806,50 +910,151 @@ def preprocess_text(text: str) -> str:
     cleaned = " ".join(important_words)
     return cleaned
 
-def extract_keywords(text: str):
-    if not text or len(text) < 3:
+def extract_keywords(raw_text: str, cleaned_text: Optional[str] = None, top_n: int = 7):
+    """
+    重要: KeyBERT は自然文のほうが強いので raw_text を優先。
+    失敗した場合のみ cleaned_text（形態素ベース）にフォールバック。
+    """
+    base_text = (raw_text or "").strip()
+    fallback_text = (cleaned_text or "").strip()
+
+    text_for_kw = base_text if len(base_text) >= 3 else fallback_text
+    if not text_for_kw or len(text_for_kw) < 3:
         return []
 
-    models = get_local_models()
-    if models is None:
-        # ローカルNLP OFF時は簡易抽出（とりあえず動かす用）
-        return re.findall(r"[一-龥ぁ-んァ-ンA-Za-z0-9]{2,}", text)[:5]
-
-    kw_model = models["kw_model"]
+    text_for_kw = unicodedata.normalize("NFKC", text_for_kw)
 
     try:
         keywords = kw_model.extract_keywords(
-            text,
+            text_for_kw,
             keyphrase_ngram_range=(1, 2),
             stop_words=None,
             use_mmr=True,
             diversity=0.7,
-            top_n=5,
+            top_n=top_n,
         )
-        return [kw for kw, score in keywords]
+        # 重複除去（順序保持）
+        out = []
+        seen = set()
+        for kw, _score in keywords:
+            if kw and kw not in seen:
+                seen.add(kw)
+                out.append(kw)
+        return out
     except Exception as e:
         print("Keyword extraction error:", e)
+        # 最後の砦：cleaned_text をスペース分割
+        if fallback_text:
+            toks = [t for t in fallback_text.split() if t]
+            return toks[:top_n]
         return []
 
-def analyze_sentiment(cleaned_text: str, raw_text: Optional[str] = None):
+def _jp_lexicon_sentiment(text: str):
     """
-    koheiduck 日本語感情モデルを使って感情分類。
-    - sentiment: 'positive' / 'negative' / 'neutral'
-    - sentiment_score: 0〜1 の極性スコア
-        0.0   = 強いネガティブ
-        0.5   = 中立付近
-        1.0   = 強いポジティブ
+    USE_LOCAL_NLP=0 のときでも、最低限 “固定” を避けるための簡易感情推定。
+    0..1 で返す（0=ネガ、0.5=中立、1=ポジ）。
+    """
+    if not text:
+        return "neutral", 0.5
 
-    重要: 感情は「生の文（raw_text）」を優先して推定する。
-    cleaned_text（名詞など抽出後の語列）は、感情ニュアンスが落ちやすい。
+    t = text
+
+    neg_words = [
+        "嫌", "つらい", "辛い", "苦しい", "最悪", "困る", "不安", "怖い", "不便", "不満",
+        "危険", "無理", "だめ", "不足", "足りない", "問題", "課題", "きつい", "しんどい",
+        "怒り", "悲しい", "減る", "悪い", "腹立つ", "許せない"
+    ]
+    pos_words = [
+        "嬉しい", "最高", "良い", "楽しい", "助かる", "安心", "便利", "満足",
+        "改善", "増える", "素晴らしい", "ありがたい", "期待"
+    ]
+    intensifiers = ["とても", "すごく", "かなり", "めちゃ", "本当に", "一番", "超"]
+    negation = ["ない", "ません", "ず", "ぬ"]
+
+    neg = sum(1 for w in neg_words if w in t)
+    pos = sum(1 for w in pos_words if w in t)
+    inten = sum(1 for w in intensifiers if w in t)
+    has_negation = any(w in t for w in negation)
+
+    # ベーススコア
+    score = 0.5 + 0.12 * (pos - neg)
+
+    # 強調語が多いほど極性を少し強める
+    if inten:
+        score += 0.03 * inten * (1 if pos > neg else (-1 if neg > pos else 0))
+
+    # 「良くない」などの反転を軽く考慮
+    if has_negation and pos > 0 and neg == 0:
+        score -= 0.15
+
+    score = max(0.0, min(1.0, float(score)))
+
+    if score <= 0.45:
+        label = "negative"
+    elif score >= 0.55:
+        label = "positive"
+    else:
+        label = "neutral"
+
+    return label, score
+
+
+def _infer_pos_neg_neu_indices(id2label: dict, probs: np.ndarray, sentiment_tokenizer, sentiment_model, torch, F):
     """
+    id2label から pos/neg/neu の index を推定。
+    取れない場合は “プローブ文” を流して自動推定する。
+    """
+    # まずは label 名から推定
+    label_to_idx = {str(v).lower(): int(k) for k, v in id2label.items()}
+    def pick(keys):
+        for key in keys:
+            if key in label_to_idx:
+                return label_to_idx[key]
+        return None
+
+    neg_idx = pick(["negative", "neg", "ネガティブ", "否定", "bad"])
+    pos_idx = pick(["positive", "pos", "ポジティブ", "肯定", "good"])
+    neu_idx = pick(["neutral", "neu", "ニュートラル", "中立"])
+
+    # それでも取れない（LABEL_0 等）なら、プローブで割り当て推定
+    if (neg_idx is None or pos_idx is None) and probs is not None and len(probs) >= 2:
+        probes = {
+            "negative": "最悪だ。とても困っている。つらい。",
+            "positive": "最高だ。とても嬉しい。助かった。",
+            "neutral":  "今日は天気です。明日は火曜日です。"
+        }
+        probe_top = {}
+        for k, s in probes.items():
+            inputs = sentiment_tokenizer(s, return_tensors="pt", truncation=True, max_length=256)
+            with torch.no_grad():
+                lg = sentiment_model(**inputs).logits
+                pr = F.softmax(lg, dim=-1)[0].detach().cpu().numpy()
+            probe_top[k] = int(np.argmax(pr))
+
+        # できるだけ重複しないように割当
+        neg_idx = probe_top.get("negative")
+        pos_idx = probe_top.get("positive")
+        neu_idx = probe_top.get("neutral")
+
+    return neg_idx, neu_idx, pos_idx
+
+def analyze_sentiment(cleaned_text: str, raw_text: Optional[str] = None):
     if not cleaned_text and not raw_text:
         return "neutral", 0.5
 
-    # ★ここが本質：raw_text を優先（なければ cleaned_text）
-    text_for_model = (raw_text or "").strip()
-    if not text_for_model:
-        text_for_model = (cleaned_text or "").strip()
+    text_for_model = cleaned_text or raw_text or ""
+
+    models = get_local_models()
+
+    # ✅ ローカルNLPがOFFでも“固定”しない（簡易推定にフォールバック）
+    if models is None:
+        return _jp_lexicon_sentiment(raw_text or cleaned_text or "")
+
+    torch = models["torch"]
+    F = models["F"]
+    sentiment_tokenizer = models["sentiment_tokenizer"]
+    sentiment_model = models["sentiment_model"]
+    SENTIMENT_ID2LABEL = models["SENTIMENT_ID2LABEL"]
 
     inputs = sentiment_tokenizer(
         text_for_model,
@@ -862,37 +1067,56 @@ def analyze_sentiment(cleaned_text: str, raw_text: Optional[str] = None):
         logits = sentiment_model(**inputs).logits
         probs = F.softmax(logits, dim=-1)[0].detach().cpu().numpy()
 
+    # pos/neg/neu の index 推定（LABEL_0 でも壊れない）
+    neg_idx, neu_idx, pos_idx = _infer_pos_neg_neu_indices(
+        SENTIMENT_ID2LABEL, probs, sentiment_tokenizer, sentiment_model, torch, F
+    )
+
+    # ラベル（最大確率）
     max_idx = int(np.argmax(probs))
-    raw_label = SENTIMENT_ID2LABEL.get(max_idx, str(max_idx))
-    sentiment = raw_label.lower()
+    raw_label = str(SENTIMENT_ID2LABEL.get(max_idx, max_idx)).lower()
 
-    # ラベル名 → インデックス
-    label_to_idx = {v.lower(): k for k, v in SENTIMENT_ID2LABEL.items()}
-    neg_idx = label_to_idx.get("negative") or label_to_idx.get("neg")
-    pos_idx = label_to_idx.get("positive") or label_to_idx.get("pos")
-
-    # pos / neg の確率から極性スコアを作る
-    if neg_idx is not None and pos_idx is not None and len(probs) >= 2:
-        neg_p = float(probs[neg_idx])
-        pos_p = float(probs[pos_idx])
-        polar = pos_p - neg_p                 # -1（完全ネガ）〜 +1（完全ポジ）
-        sentiment_score = (polar + 1.0) / 2.0 # 0〜1 に正規化
+    # ラベル名が使えない場合の最終整形
+    if pos_idx is not None and max_idx == pos_idx:
+        sentiment = "positive"
+    elif neg_idx is not None and max_idx == neg_idx:
+        sentiment = "negative"
+    elif neu_idx is not None and max_idx == neu_idx:
+        sentiment = "neutral"
     else:
-        # pos / neg がはっきりないモデルの場合はラベルからざっくり決める
-        if sentiment.startswith("neg"):
-            sentiment_score = 0.0
-        elif sentiment.startswith("pos"):
-            sentiment_score = 1.0
+        # 最後の最後は raw_label から推定、無理なら neutral
+        if "pos" in raw_label or "positive" in raw_label:
+            sentiment = "positive"
+        elif "neg" in raw_label or "negative" in raw_label:
+            sentiment = "negative"
+        elif "neu" in raw_label or "neutral" in raw_label:
+            sentiment = "neutral"
         else:
-            sentiment_score = 0.5
+            sentiment = "neutral"
 
-    # ネガ/ポジ表現・「けど」構文で補正（raw_text があればそれで補正）
+    # ✅ ここが重要：neutral が強いと pos-neg 差分は 0.5 に潰れやすいので
+    # 3クラスなら score = pos + 0.5*neutral を採用（分布の違いが反映される）
+    if pos_idx is not None and neg_idx is not None and len(probs) >= 3:
+        pos_p = float(probs[pos_idx])
+        neg_p = float(probs[neg_idx])
+        if neu_idx is not None:
+            neu_p = float(probs[neu_idx])
+        else:
+            # 残りを中立として扱う
+            neu_p = max(0.0, 1.0 - pos_p - neg_p)
+        sentiment_score = pos_p + 0.5 * neu_p
+    elif pos_idx is not None and len(probs) >= 2:
+        # 2クラス（pos/neg）っぽいとき：pos確率をそのままスコアに
+        sentiment_score = float(probs[pos_idx])
+    else:
+        sentiment_score = 0.5
+
     if raw_text:
         sentiment, sentiment_score = adjust_sentiment_by_negative_words(
             sentiment, sentiment_score, raw_text
         )
 
-    sentiment_score = float(max(0.0, min(sentiment_score, 1.0)))
+    sentiment_score = max(0.0, min(1.0, float(sentiment_score)))
     return sentiment, sentiment_score
 
 def estimate_urgency(text: str, sentiment: Optional[str] = None, sentiment_score: float = 0.5):
