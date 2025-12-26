@@ -205,6 +205,7 @@
     .summary-panel {
       margin: 0 auto;
       max-width: 960px;
+      width: min(960px, calc(100% - 14px)); /* 追加：画面幅に追従 */
       background: #ffffff;
       border-radius: 16px 16px 0 0;
       box-shadow: var(--kc-shadow-soft);
@@ -237,7 +238,7 @@
     }
 
     .summary-title {
-      font-size: 13px;
+      font-size: clamp(13px, 1.2vw, 15px);
       font-weight: 600;
       display: flex;
       align-items: center;
@@ -256,7 +257,7 @@
     }
 
     .summary-subtitle {
-      font-size: 11px;
+      font-size: clamp(11px, 1vw, 13px);
       color: var(--kc-text-sub);
     }
 
@@ -283,12 +284,16 @@
 
     .summary-body {
       padding: 10px 16px 14px;
-      max-height: 40vh;
-      overflow-y: auto;
-      font-size: 13px;
-      line-height: 1.6;
+      max-height: 55vh;                 /* PCでは少し広め */
+      overflow: auto;                   /* 縦も横も必要ならスクロール */
+      font-size: clamp(13px, 1.15vw, 15px);
+      line-height: 1.75;
       color: #374151;
+
+      /* 途中で見切れないための“折り返し最強セット” */
       white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      word-break: break-word;
     }
 
     .summary-body::-webkit-scrollbar {
@@ -786,11 +791,30 @@
   }
 
   /* スマホはタイトル周りも少し大きく */
-  @media (max-width: 768px) {
-    .summary-title { font-size: 15px; }
-    .summary-subtitle { font-size: 12px; }
-    .summary-body { font-size: 15px; }
-    .leaflet-popup-content { font-size: 14px; line-height: 1.55; }
+  @media (max-width: 640px) {
+    .summary-panel {
+      width: calc(100% - 10px);
+      border-radius: 18px 18px 0 0;
+    }
+
+    .summary-header {
+      padding: 12px 14px 8px;
+    }
+
+    .summary-title {
+      font-size: 15px;
+    }
+
+    .summary-subtitle {
+      font-size: 12px;
+    }
+
+    .summary-body {
+      font-size: 15px;                /* スマホは読みやすく */
+      max-height: 68vh;               /* 画面をより使う */
+      padding: 12px 14px calc(18px + env(safe-area-inset-bottom));
+      line-height: 1.85;
+    }
   }
   </style>
 </head>
@@ -943,6 +967,9 @@
       attribution: "&copy; OpenStreetMap contributors",
     }).addTo(map);
 
+    // 住民の声マーカー（再読み込み時にクリアできるように）
+    const voiceLayer = L.layerGroup().addTo(map);
+
     // ----------------------------
     //  地区 → 代表座標
     // ----------------------------
@@ -1004,7 +1031,7 @@
     // ----------------------------
     async function loadVoices() {
       try {
-        const res = await fetch("/admin/api/voices");
+        const res = await fetch("/admin/api/voices?limit=2000");
         if (!res.ok) {
           console.error("API error", res.status, await res.text());
           return;
@@ -1020,6 +1047,8 @@
     //  マーカー描画
     // ----------------------------
     function plotVoices(voices) {
+      voiceLayer.clearLayers();
+
       voices.forEach((v) => {
         let lat = v.lat;
         let lng = v.lng;
@@ -1049,7 +1078,7 @@
           fillColor: color,
           fillOpacity: 0.8,
           weight: 2,
-        }).addTo(map);
+        }).addTo(voiceLayer);
 
         const sentimentText = v.sentiment
           ? `${v.sentiment} (${(v.sentiment_score ?? 0).toFixed(2)})`

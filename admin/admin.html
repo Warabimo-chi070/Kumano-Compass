@@ -183,11 +183,14 @@
 
     /* テーブル */
     .table-wrapper {
-      margin-top: 8px;
-      border-radius: var(--radius-md);
-      overflow: hidden;
-      border: 1px solid rgba(148, 163, 184, 0.4);
-      background: linear-gradient(to bottom, #f9fafb, #ffffff);
+      border-radius: 14px;
+      border: 1px solid rgba(148, 163, 184, 0.55);
+      background: rgba(15, 23, 42, 0.02);
+
+      /* 20件を超えても全件表示し、枠内だけスクロール */
+      max-height: 60vh;
+      overflow: auto;
+      -webkit-overflow-scrolling: touch;
     }
 
     table {
@@ -199,6 +202,9 @@
     thead {
       background: rgba(15, 23, 42, 0.04);
       border-bottom: 1px solid rgba(148, 163, 184, 0.4);
+      position: sticky;
+      top: 0;
+      z-index: 2;
     }
 
     th, td {
@@ -716,7 +722,7 @@
     <section class="card">
       <div class="card-header">
         <div>
-          <div class="card-title">住民の声（最新20件）</div>
+          <div class="card-title">住民の声（一覧）</div>
           <div class="card-sub">AIが自動付与したカテゴリ・感情・重要度スコアをまとめて確認できます。</div>
         </div>
         <button class="btn" onclick="loadVoices(true)">
@@ -868,7 +874,7 @@
       }
 
       try {
-        const res = await fetch("/admin/api/voices");
+        const res = await fetch("/admin/api/voices?limit=2000")
         if (!res.ok) {
           throw new Error(await res.text());
         }

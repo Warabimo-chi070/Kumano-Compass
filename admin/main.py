@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
 from pydantic import BaseModel
 import uvicorn
 import re
@@ -153,46 +153,66 @@ CATEGORY_RULES = {
         "タクシー", "送迎", "ライドシェア",
         "道路", "渋滞", "危険", "交通", "インフラ", "移動",
         "通勤", "通学", "駅", "電車", "免許", "運転",
+        "駅", "電車", "鉄道", "停留所", "乗り換え", "終バス", "終電",
+        "車", "運転", "免許", "駐車", "送迎", "足がない", "行けない",
+        "街灯", "暗い", "信号", "横断歩道", "歩道", "通学路",        
     ],
     "医療": [
         "病院", "診療所", "医者", "救急", "救命", "薬局",
         "通院", "医療", "往診", "健診", "検診", "産婦人科",
+        "小児科", "内科", "外科", "歯医者", "歯科",
+        "受診", "夜間", "休日診療",
     ],
     "高齢化・福祉": [
         "高齢", "年寄り", "介護", "独居", "見守り",
         "買い物弱者", "福祉", "老人", "要支援", "要介護",
         "免許返納", "認知症",
+        "送迎", "足腰", "認知症", "孤独", "孤立", "ヘルパー",
     ],
     "子育て・教育": [
         "保育園", "幼稚園", "認定こども園", "小学校", "中学校", "高校",
         "学童", "放課後", "子ども", "児童", "生徒", "保護者",
         "育児", "子育て", "教育", "先生", "部活", "遊び場",
         "奨学金", "進学", "通学",
+        "子供", "こども", "育児", "子育て", "学童", "放課後",
+        "先生", "教育", "塾", "習い事", "受験", "校区",
+        "オンライン授業",
     ],
     "観光": [
         "観光", "滞在", "宿泊", "民泊", "旅行",
         "花火", "祭り", "イベント", "虫送り", "ホタル", "景勝地", "名所",
         "温泉", "世界遺産", "熊野古道",
-        "インバウンド",
+        "インバウンド", "観光客", "旅館", "ホテル", "温泉",
+        "PR", "魅力", "ツアー", "ガイド", "体験", "イベント",
     ],
     "商店街・地域経済": [
         "商店街", "店", "お店", "スーパー", "コンビニ", "飲食店", "買い物",
         "空き店舗", "空き家", "雇用", "求人",
         "仕事", "職", "地元企業", "経済", "産業", "商業",
         "賃金", "給料", "給与", "収入", "物価", "後継者", "担い手",
+        "求人", "給料", "賃金", "時給", "収入", "働く", "稼ぐ",
+        "後継者", "起業", "創業", "シャッター街", "廃業",
+        "飲食店", "スーパー", "コンビニ", "ドラッグストア", "市場",
     ],
     "自然環境": [
         "海", "川", "山", "森", "自然", "生態系",
         "景観", "環境", "動植物", "ごみ", "清掃", "海岸", "森林",
+        "ホタル", "星空", "自然保護", "エコツーリズム",
+        "ゴミ", "ごみ", "清掃", "海岸", "河川", "山道",
+        "獣害", "シカ", "イノシシ", "熊", "鳥獣",
     ],
     "防災・津波": [
         "津波", "南海トラフ", "避難", "洪水", "浸水",
         "災害", "危険箇所", "ハザード", "地震", "土砂", "土砂災害",
         "避難所", "防災",
+        "避難所", "備蓄", "警報", "土砂", "土砂災害", "崖", "落石",
+        "豪雨", "台風", "停電", "断水",
     ],
     "行政サービス": [
         "市役所", "行政", "制度", "申請", "広報",
         "サービス", "支援", "相談", "補助金", "助成金", "手続き",
+        "補助金", "助成", "手続き", "窓口", "税", "保険", "年金",
+        "マイナンバー", "届出", "証明書", "オンライン申請",
     ],
 }
 
@@ -379,28 +399,33 @@ async def root():
 async def admin_page():
     return FileResponse(BASE_DIR / "admin.html")
 
-
 @app.get("/admin/map")
 async def admin_map_page():
     return FileResponse(BASE_DIR / "map.html")
 
-
 @app.get("/admin/api/voices")
-def get_latest_voices():
+def get_latest_voices(
+    limit: int = Query(2000, ge=1, le=5000),
+    offset: int = Query(0, ge=0),
+):
     """
-    Supabase の 'voices' テーブルから最新20件を取得
+    Supabase の 'voices' テーブルから意見を取得します。
+
+    - limit: 返す件数（デフォルト2000件 / 最大5000件）
+    - offset: 先頭からのスキップ数（ページング用）
     """
     try:
+        # Supabase の range は 0-index で「開始〜終了(含む)」
         response = (
             supabase.table("voices")
             .select("*")
             .order("created_at", desc=True)
-            .limit(20)
+            .range(offset, offset + limit - 1)
             .execute()
         )
         rows = response.data or []
 
-        # DB カラム important_score → API 上は importance_score にコピー
+        # 念のための互換（古いフィールド名が混ざっても壊れないように）
         for row in rows:
             if "importance_score" not in row and "important_score" in row:
                 row["importance_score"] = row["important_score"]
@@ -463,7 +488,7 @@ def get_global_report():
 全体AI分析レポート
 
 1. 全体像（大きな課題テーマ）
-- 全体として見えてくる大きな課題テーマを 3〜5 個挙げ、
+- 分析時点で寄せられている意見をすべて検討し、全体として見えてくる大きな課題テーマを 3〜5 個挙げ、
   それぞれに 2〜3 行の簡潔な説明を付けてください。
 
 2. 地区ごとの特徴
@@ -481,10 +506,9 @@ def get_global_report():
 - 地域住民・地元団体
 - 学生ボランティアチーム
   それぞれについて、具体的な打ち手アイデアを 3〜5 個ずつ箇条書きで提案してください。
-  （例：◯◯の情報発信を強化する、◯◯ワークショップを試行する 等）
 
 5. 今後の検討・調査の方向性
-- 学生チームが現地で検討を深める際に意識すると良さそうな
+- 学生チームが検討を深める際に意識すると良さそうな
   「問いかけ」や「次の調査テーマ」を 3〜5 個挙げてください。
 
 文章全体は、市役所の担当者が読んでも分かりやすいように、
@@ -736,56 +760,76 @@ def ensure_category_centers():
 
 def classify_category_by_semantic(keywords: list, raw_text: Optional[str] = None) -> str:
     """
-    改良版：
-    - keywords だけでなく raw_text（本文）もルールマッチに使う
-    - ルールである程度当たるなら未分類に落とさない
-    - 意味類似度は補助として使う
+    改良版（未分類を減らす）:
+    - keywords だけでなく raw_text（本文）でもルールマッチ
+    - ルールが弱く当たった場合でも、未分類に落としにくくする
+    - 意味類似度は“あれば補助”。なければルールで完結（Render軽量運用OK）
     """
-    raw = unicodedata.normalize("NFKC", (raw_text or ""))
+    raw = _norm_for_match(raw_text or "")
     keywords = [k for k in (keywords or []) if k]
+    kw_norm = [_norm_for_match(k) for k in keywords]
 
-    if not keywords and not raw:
+    if not raw and not kw_norm:
         return "未分類"
 
     # スコア初期化
     scores = {cat: 0.0 for cat in CATEGORY_RULES.keys()}
 
-    # ① ルールベース（強め）：本文に出てきたら +2、keywords に出てきたら +1
+    # ① ルールベース
+    # - 本文ヒットは強い
+    # - keywordsヒットは弱い（でも“ヒットした事実”は尊重して未分類回避に使う）
     for category, words in CATEGORY_RULES.items():
         for w in words:
-            if raw and w in raw:
-                scores[category] += 2.0
-        for kw in keywords:
-            for w in words:
-                if w in kw:
-                    scores[category] += 1.0
+            w_norm = _norm_for_match(w)
+            if not w_norm:
+                continue
 
-    # ルールヒットがあるなら、ここで決め切る（未分類に落としにくくする）
+            # 1文字語は誤爆しやすいので加点を軽く
+            raw_weight = 1.0 if len(w_norm) <= 1 else 2.0
+            kw_weight = 0.4 if len(w_norm) <= 1 else 0.8
+
+            if raw and w_norm in raw:
+                scores[category] += raw_weight
+
+            for k in kw_norm:
+                if w_norm and w_norm in k:
+                    scores[category] += kw_weight
+
+    # ルール結果
     best_rule_cat = max(scores, key=scores.get)
     best_rule_score = scores[best_rule_cat]
-    rule_hit = best_rule_score >= 2.0  # 本文ヒットが1個でもあるイメージ
 
-    # ② 意味類似度（補助）：keywords がある場合のみ
-    if keywords:
+    # ★ここが重要：弱いルールヒットでも未分類に落としにくくする
+    # 例：keywords由来の0.8でも「完全未分類」よりマシとして採用
+    if best_rule_score >= 0.8:
+        return best_rule_cat
+
+    # ② 意味類似（使える場合のみ補助）
+    # Render軽量運用で keyword_model が無いケースでも落ちないようにする
+    try:
+        models = get_local_models() if "get_local_models" in globals() else None
+    except Exception:
+        models = None
+
+    if models is not None and keywords:
         try:
+            ensure_category_centers()
+            keyword_model = models["keyword_model"]
+            st_util = models["st_util"]
+
             kw_vecs = keyword_model.encode(keywords)
             for kw_vec in kw_vecs:
                 for category, cat_vec in category_vectors.items():
-                    sim = util.cos_sim(kw_vec, cat_vec).item()
+                    sim = st_util.cos_sim(kw_vec, cat_vec).item()
                     if sim > 0:
-                        scores[category] += 0.8 * sim
+                        scores[category] += 0.6 * sim  # 補助なので弱め
         except Exception as e:
             print("Semantic similarity error:", e)
 
     best_category = max(scores, key=scores.get)
     best_score = scores[best_category]
 
-    # ルールで当たってるなら未分類に落とさない
-    if rule_hit:
-        return best_rule_cat
-
-    # ルール弱い + 意味類似も弱い → 未分類
-    # （ここを下げるほど未分類は減るが誤分類は増える。まずは 0.18 推奨）
+    # 最終的にどうしても弱い場合だけ未分類
     if best_score < 0.18:
         return "未分類"
 
@@ -823,7 +867,7 @@ async def analyze(payload: TextPayload):
     nlp_id = str(uuid.uuid4())
     cleaned = preprocess_text(text)
 
-    keywords = extract_keywords(raw_text=text, cleaned_text=cleaned, top_n=7)
+    keywords = extract_keywords(raw_text=text, cleaned_text=cleaned, top_n=10)
     category = classify_category_by_semantic(keywords, raw_text=text)
     sentiment, sentiment_score = analyze_sentiment(cleaned_text=cleaned, raw_text=text)
     urgency = estimate_urgency(text, sentiment, sentiment_score)
@@ -909,6 +953,15 @@ def preprocess_text(text: str) -> str:
 
     cleaned = " ".join(important_words)
     return cleaned
+
+def _norm_for_match(s: str) -> str:
+    s = unicodedata.normalize("NFKC", s or "")
+    s = s.lower()
+    # 空白は除去（日本語はスペースがノイズになりがち）
+    s = re.sub(r"\s+", "", s)
+    # 記号類をざっくり除去
+    s = re.sub(r"[、。,.!！?？「」『』（）()【】\[\]{}<>〈〉《》…・:：;；／/\\\-_|~`'\"“”‘’]", "", s)
+    return s
 
 def extract_keywords(raw_text: str, cleaned_text: Optional[str] = None, top_n: int = 7):
     """
