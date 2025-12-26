@@ -30,405 +30,49 @@
       --kc-radius-lg: 16px;
       --kc-radius-md: 10px;
       --kc-shadow-soft: 0 12px 30px rgba(15, 23, 42, 0.18);
+
+      /* ナビ高さ（#mapの押し下げに使用） */
       --kc-nav-height: 64px;
-      --kc-nav-height-mobile: 56px;
+      --kc-nav-height-mobile: 70px;
     }
 
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
+
+    html { -webkit-text-size-adjust: 100%; }
 
     body {
       margin: 0;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-        sans-serif;
+      height: 100%;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       background: var(--kc-bg);
       color: var(--kc-text-main);
       overflow: hidden;
     }
 
-    /* ===== 上部ツールバー（銀行アプリ風） ===== */
-    .toolbar {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 64px;
-      padding: 0 16px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      backdrop-filter: blur(14px);
-      -webkit-backdrop-filter: blur(14px);
-      background: linear-gradient(
-        90deg,
-        rgba(255, 255, 255, 0.94),
-        rgba(248, 251, 255, 0.96)
-      );
-      border-bottom: 1px solid rgba(209, 213, 219, 0.7);
-      z-index: 1000;
+    /* ボタンのブラウザ既定スタイル差を吸収 */
+    button {
+      font: inherit;
+      color: inherit;
+      -webkit-appearance: none;
+      appearance: none;
     }
 
-    .toolbar-left,
-    .toolbar-right {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .toolbar-title {
-      font-weight: 700;
-      letter-spacing: 0.02em;
-      font-size: 16px;
-      color: var(--kc-text-main);
-    }
-
-    .toolbar-sub {
-      font-size: 11px;
-      color: var(--kc-text-sub);
-      margin-top: 2px;
-    }
-
-    .toolbar-center {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-
-    .toolbar-button {
-      border: none;
-      border-radius: 999px;
-      padding: 7px 14px;
-      font-size: 12px;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      cursor: pointer;
-      background: white;
-      color: var(--kc-text-main);
-      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
-      transition:
-        transform 0.13s ease-out,
-        box-shadow 0.13s ease-out,
-        background 0.13s ease-out,
-        color 0.13s ease-out;
-    }
-
-    .toolbar-button.primary {
-      background: var(--kc-primary);
-      color: white;
-      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.45);
-    }
-
-    .toolbar-button.icon-only {
-      padding-inline: 10px;
-      border-radius: 50%;
-      width: 34px;
-      height: 34px;
-      justify-content: center;
-    }
-
-    .toolbar-button span.icon {
-      font-size: 14px;
-    }
-
-    .toolbar-button:hover {
-      transform: translateY(-1px) scale(1.04);
-      box-shadow: 0 6px 16px rgba(15, 23, 42, 0.25);
-      background: #f9fafb;
-    }
-
-    .toolbar-button.primary:hover {
-      background: #1f60e7;
-      box-shadow: 0 7px 18px rgba(37, 99, 235, 0.55);
-    }
-
-    .toolbar-button:active {
-      transform: translateY(0) scale(0.97);
-      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.20);
-    }
-
-    /* ===== マップ本体 ===== */
-    #map {
-      position: absolute;
-      inset: 64px 0 0 0; /* 上はツールバー分あける */
-      width: 100%;
-      height: calc(100vh - 64px);
-      z-index: 1;
-    }
-
-    /* ===== 凡例 ===== */
-    .legend {
-      background: rgba(255, 255, 255, 0.95);
-      padding: 10px 12px;
-      line-height: 1.4;
-      font-size: 11px;
-      border-radius: 12px;
-      box-shadow: 0 10px 20px rgba(15, 23, 42, 0.2);
-      border: 1px solid rgba(209, 213, 219, 0.9);
-    }
-    .legend-title {
-      font-weight: 600;
-      margin-bottom: 4px;
-      font-size: 11px;
-      color: var(--kc-text-sub);
-      letter-spacing: 0.03em;
-      text-transform: uppercase;
-    }
-    .legend-item {
-      display: flex;
-      align-items: center;
-      margin-bottom: 3px;
-    }
-    .legend-color {
-      width: 10px;
-      height: 10px;
-      border-radius: 999px;
-      margin-right: 6px;
-      border: 1px solid #555;
-    }
-    .legend-label {
-      white-space: nowrap;
-    }
-
-    /* ===== サマリーパネル（AIレポート表示） ===== */
-    .summary-panel-wrapper {
-      position: fixed;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      pointer-events: none;
-      z-index: 1100;
-    }
-
-    .summary-panel {
-      margin: 0 auto;
-      max-width: 960px;
-      width: min(960px, calc(100% - 14px)); /* 追加：画面幅に追従 */
-      background: #ffffff;
-      border-radius: 16px 16px 0 0;
-      box-shadow: var(--kc-shadow-soft);
-      border-top: 1px solid rgba(226, 232, 240, 0.9);
-      transform: translateY(100%);
-      opacity: 0;
-      transition:
-        transform 0.26s cubic-bezier(0.16, 0.84, 0.44, 1),
-        opacity 0.2s ease-out;
-      pointer-events: auto;
-    }
-
-    .summary-panel.visible {
-      transform: translateY(0%);
-      opacity: 1;
-    }
-
-    .summary-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 10px 16px 6px;
-      border-bottom: 1px solid #edf2ff;
-    }
-
-    .summary-header-main {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-
-    .summary-title {
-      font-size: clamp(13px, 1.2vw, 15px);
-      font-weight: 600;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .summary-chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      padding: 2px 6px;
-      border-radius: 999px;
-      font-size: 11px;
-      background: var(--kc-primary-soft);
-      color: var(--kc-primary);
-    }
-
-    .summary-subtitle {
-      font-size: clamp(11px, 1vw, 13px);
-      color: var(--kc-text-sub);
-    }
-
-    .summary-close-btn {
-      border: none;
-      background: transparent;
-      cursor: pointer;
-      width: 28px;
-      height: 28px;
-      border-radius: 999px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--kc-text-sub);
-      transition:
-        background 0.12s ease-out,
-        transform 0.12s ease-out;
-    }
-
-    .summary-close-btn:hover {
-      background: #f3f4ff;
-      transform: rotate(5deg);
-    }
-
-    .summary-body {
-      padding: 10px 16px 14px;
-      max-height: 55vh;                 /* PCでは少し広め */
-      overflow: auto;                   /* 縦も横も必要ならスクロール */
-      font-size: clamp(13px, 1.15vw, 15px);
-      line-height: 1.75;
-      color: #374151;
-
-      /* 途中で見切れないための“折り返し最強セット” */
-      white-space: pre-wrap;
-      overflow-wrap: anywhere;
-      word-break: break-word;
-    }
-
-    .summary-body::-webkit-scrollbar {
-      width: 6px;
-    }
-    .summary-body::-webkit-scrollbar-thumb {
-      background: #cbd5f5;
-      border-radius: 999px;
-    }
-
-    .summary-loading {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 12px;
-      color: var(--kc-text-sub);
-    }
-
-    .spinner {
-      width: 14px;
-      height: 14px;
-      border-radius: 50%;
-      border: 2px solid #cbd5ff;
-      border-top-color: var(--kc-primary);
-      animation: spin 0.6s linear infinite;
-    }
-
-    @keyframes spin {
-      to {
-        transform: rotate(1turn);
-      }
-    }
-
-    /* ===== Leaflet popup内のAIボタン ===== */
-    .popup-ai-btn {
-      margin-top: 6px;
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      padding: 4px 8px;
-      border-radius: 999px;
-      border: none;
-      background: var(--kc-primary-soft);
-      color: var(--kc-primary);
-      font-size: 11px;
-      cursor: pointer;
-      transition:
-        background 0.12s ease-out,
-        transform 0.12s ease-out,
-        box-shadow 0.12s ease-out;
-    }
-
-    .popup-ai-btn:hover {
-      background: rgba(36, 107, 253, 0.18);
-      transform: translateY(-1px);
-      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.25);
-    }
-
-    .popup-ai-btn:active {
-      transform: translateY(0);
-      box-shadow: none;
-    }
-
-    /* スマホ対応（map画面用） */
-    @media (max-width: 768px) {
-      /* ナビの下からマップを表示（共通メニューバーはそのまま） */
-      #map {
-        position: absolute;
-        inset: 78px 0 0 0;                 /* 上はナビ＋少し余裕 */
-        height: calc(100vh - 78px);
-        width: 100%;
-      }
-
-      /* Leafletのコントロール類を少し大きく、押しやすく */
-      .leaflet-control-zoom {
-        border-radius: 999px;
-        overflow: hidden;
-        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.35);
-      }
-
-      .leaflet-control-zoom a {
-        width: 32px;
-        height: 32px;
-        line-height: 30px;
-        font-size: 18px;
-      }
-
-      /* 凡例は小さめのチップ風に */
-      .legend {
-        font-size: 10px;
-        padding: 8px 10px;
-        border-radius: 999px;
-        box-shadow: 0 8px 18px rgba(15, 23, 42, 0.25);
-      }
-
-      .legend-title {
-        font-size: 10px;
-      }
-
-      /* ボトムシート（AIレポート）をフル幅＋少し高めに */
-      .summary-panel-wrapper {
-        padding: 0 6px 6px;
-      }
-
-      .summary-panel {
-        max-width: 100%;
-        border-radius: 18px 18px 0 0;
-      }
-
-      .summary-handle {
-        width: 40px;
-        height: 4px;
-        border-radius: 999px;
-        background: rgba(148, 163, 184, 0.9);
-        margin: 6px auto 4px;
-      }
-
-      .summary-body {
-        max-height: 52vh;       /* 画面の約半分ちょっとまで表示 */
-        font-size: 12px;
-      }
-    }
-
-    /* ==== Kumano Compass 共通ナビバー ==================== */
+    /* =========================
+       Kumano Compass 共通ナビバー
+       ========================= */
     .kc-nav {
       position: fixed;
       top: 0;
       left: 0;
       right: 0;
-      height: 64px;
+      height: var(--kc-nav-height);
       z-index: 1000;
       padding: 0 18px;
+
       display: flex;
       align-items: center;
       justify-content: center;
+
       background: radial-gradient(circle at top left,
                   rgba(226, 239, 255, 0.95),
                   rgba(255, 255, 255, 0.98));
@@ -442,10 +86,12 @@
       width: 100%;
       max-width: 1120px;
       margin: 0 auto;
+
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 12px;
+      min-width: 0;
     }
 
     .kc-nav-left {
@@ -454,9 +100,11 @@
       gap: 10px;
       min-width: 0;
       cursor: pointer;
-      padding: 6px 0;
+
+      padding: 0;
       border: none;
       background: transparent;
+      line-height: 1;
     }
 
     .kc-nav-logo-dot {
@@ -466,18 +114,26 @@
       background: radial-gradient(circle at 30% 20%, #ffffff 0, #93c5fd 35%, #2563eb 100%);
       box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.22);
       animation: kc-nav-breath 3.2s ease-in-out infinite;
+      flex: 0 0 auto;
     }
 
     .kc-nav-logo-text {
       display: flex;
       flex-direction: column;
+      justify-content: center;
+      gap: 2px;
+      min-width: 0;
+      line-height: 1.15;
     }
 
     .kc-nav-title {
       font-size: 16px;
       font-weight: 700;
       letter-spacing: 0.06em;
-      color: #111827; /* 濃いめの文字色に固定 */
+      color: #111827;
+      margin: 0;
+      line-height: 1.15;
+      white-space: nowrap;
     }
 
     .kc-nav-sub {
@@ -486,6 +142,8 @@
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      line-height: 1.2;
+      margin: 0;
     }
 
     .kc-nav-center {
@@ -493,26 +151,29 @@
       display: flex;
       justify-content: center;
       gap: 8px;
+      min-width: 0;
     }
 
     .kc-nav-link {
       position: relative;
-      padding: 6px 14px;
+      padding: 8px 14px;
       border-radius: 999px;
       font-size: 12px;
+      line-height: 1;
       color: #4b5563;
       text-decoration: none;
+
       display: inline-flex;
       align-items: center;
+      justify-content: center;
       gap: 6px;
-      border: 1px solid rgba(148, 163, 184, 0.7); /* ← 枠線つける */
+
+      border: 1px solid rgba(148, 163, 184, 0.7);
       background: rgba(255, 255, 255, 0.9);
       cursor: pointer;
-      transition:
-        background 0.18s ease-out,
-        color 0.18s ease-out,
-        transform 0.18s ease-out,
-        border-color 0.18s ease-out;
+
+      transition: background 0.18s ease-out, color 0.18s ease-out, transform 0.18s ease-out, border-color 0.18s ease-out;
+      white-space: nowrap;
     }
 
     .kc-nav-link::after {
@@ -531,291 +192,401 @@
 
     .kc-nav-link:hover {
       background: rgba(239, 246, 255, 0.95);
-      border-color: rgba(59, 130, 246, 0.9); /* ホバー時に枠を少し濃く */
+      border-color: rgba(59, 130, 246, 0.9);
       transform: translateY(-1px);
     }
-
-    .kc-nav-link:hover::after {
-      transform: scaleX(1);
-    }
+    .kc-nav-link:hover::after { transform: scaleX(1); }
 
     .kc-nav-link.active {
       background: rgba(219, 234, 254, 0.95);
       color: #1d4ed8;
-      border-color: rgba(37, 99, 235, 1); /* アクティブはしっかり青枠 */
+      border-color: rgba(37, 99, 235, 1);
     }
-
-    .kc-nav-link.active::after {
-      transform: scaleX(1);
-    }
+    .kc-nav-link.active::after { transform: scaleX(1); }
 
     .kc-nav-right {
       display: flex;
       align-items: center;
       gap: 8px;
-    }
-
-    .kc-nav-pill {
-      font-size: 10px;
-      padding: 4px 10px;
-      border-radius: 999px;
-      background: rgba(148, 163, 184, 0.12);
-      color: #6b7280;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .kc-nav-pill-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: #22c55e;
-      box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.35);
-    }
-
-    /* コンテンツ押し下げ用（index/adminで使う） */
-    .kc-nav-spacer {
-      height: 72px;
+      flex: 0 0 auto;
     }
 
     .kc-nav-cta {
-  border-radius: 999px;
-  padding: 7px 14px;
-  font-size: 12px;
-  font-weight: 600;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  background: linear-gradient(135deg, #2563eb, #4f46e5);
-  color: #ffffff;
-  border: 1px solid rgba(37, 99, 235, 1); /* ← 枠線追加 */
-  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.45);
-  transition:
-    transform 0.16s ease-out,
-    box-shadow 0.18s ease-out,
-    opacity 0.16s ease-out,
-    border-color 0.18s ease-out;
-}
+      border-radius: 999px;
+      padding: 8px 14px;
+      font-size: 12px;
+      font-weight: 600;
+      line-height: 1;
 
-.kc-nav-cta:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 16px 30px rgba(37, 99, 235, 0.55);
-  border-color: #1d4ed8;
-}
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
 
-.kc-nav-cta:active {
-  transform: translateY(0);
-  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.45);
-}
+      cursor: pointer;
+      background: linear-gradient(135deg, #2563eb, #4f46e5);
+      color: #ffffff;
+      border: 1px solid rgba(37, 99, 235, 1);
+      box-shadow: 0 10px 24px rgba(37, 99, 235, 0.45);
 
-    /* アニメーション */
-
-    @keyframes kc-nav-slide-in {
-      from {
-        transform: translateY(-100%);
-        opacity: 0;
-      }
-      to {
-        transform: translateY(0%);
-        opacity: 1;
-      }
+      transition: transform 0.16s ease-out, box-shadow 0.18s ease-out, opacity 0.16s ease-out, border-color 0.18s ease-out;
+    }
+    .kc-nav-cta:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 16px 30px rgba(37, 99, 235, 0.55);
+      border-color: #1d4ed8;
+    }
+    .kc-nav-cta:active {
+      transform: translateY(0);
+      box-shadow: 0 6px 18px rgba(37, 99, 235, 0.45);
     }
 
-    @keyframes kc-nav-breath {
-      0% {
-        transform: scale(1);
-        box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.22);
-      }
-      50% {
-        transform: scale(1.06);
-        box-shadow: 0 0 0 8px rgba(37, 99, 235, 0.0);
-      }
-      100% {
-        transform: scale(1);
-        box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.22);
-      }
-    }
-
-    /* === 共通メニューバー：スマホ用レイアウト（視認性重視） === */
-    @media (max-width: 768px) {
-      .kc-nav {
-        height: 70px;
-        padding: 6px 10px;
-      }
-
-      .kc-nav-inner {
-        align-items: center;
-        gap: 6px;
-      }
-
-      .kc-nav-left {
-        gap: 6px;
-      }
-
-      .kc-nav-logo-dot {
-        width: 22px;
-        height: 22px;
-      }
-
-      .kc-nav-title {
-        font-size: 13px;
-      }
-
-      /* 説明文はスマホでは非表示にしてナビをスッキリ */
-      .kc-nav-sub {
-        display: none;
-      }
-
-      /* 中央タブ：3つを均等幅の大きなボタンにする */
-      .kc-nav-center {
-        flex: 1;
-        justify-content: space-between;
-        gap: 4px;
-      }
-
-      .kc-nav-link {
-        flex: 1;                     /* 3つで横幅を等分 */
-        justify-content: center;
-        padding: 8px 4px;
-        font-size: 11px;
-      }
-
-      /* これまで隠していたラベルもスマホで表示して視認性UP */
-      .kc-nav-link span:last-child {
-        display: inline;
-      }
-
-      /* ステータスピル（オンライン／Supabase連携中）は隠す */
-      .kc-nav-right .kc-nav-pill {
-        display: none;
-      }
-
-      /* mapページなどのCTAボタンは小さめに残す */
-      .kc-nav-right .kc-nav-cta {
-        padding: 6px 10px;
-        font-size: 11px;
-      }
-
-      /* コンテンツの押し下げ量も少し増やす */
-      .kc-nav-spacer {
-        height: 78px;
-      }
-    }
-    
     /* =========================
-    Mobile UX Patch (Map + Report)
-    ========================= */
+       マップ本体
+       ========================= */
+    #map {
+      position: absolute;
+      inset: var(--kc-nav-height) 0 0 0;
+      width: 100%;
+      height: calc(100dvh - var(--kc-nav-height));
+      z-index: 1;
+    }
 
-  html { -webkit-text-size-adjust: 100%; }
+    /* =========================
+       凡例（カテゴリ）
+       ========================= */
+    .legend {
+      background: rgba(255, 255, 255, 0.95);
+      padding: 10px 12px;
+      line-height: 1.35;
+      font-size: 11px;
+      border-radius: 14px;
+      box-shadow: 0 10px 20px rgba(15, 23, 42, 0.2);
+      border: 1px solid rgba(209, 213, 219, 0.9);
+    }
+    .legend-title {
+      font-weight: 700;
+      margin-bottom: 6px;
+      font-size: 11px;
+      color: var(--kc-text-sub);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+    .legend-item:last-child { margin-bottom: 0; }
 
-  /* ボトムシート全体を“ドラッグ/タップで縮小⇄拡大”できるようにする */
-  .summary-panel {
-    display: flex;
-    flex-direction: column;
-    max-height: calc(100vh - 72px);
-  }
+    .legend-color {
+      width: 10px;
+      height: 10px;
+      border-radius: 3px; /* ← “丸”をやめて四角寄りに */
+      border: 1px solid rgba(17, 24, 39, 0.55);
+      flex: 0 0 auto;
+    }
 
-  /* iPhoneのホームバー分の余白 */
-  .summary-panel-wrapper {
-    padding-bottom: env(safe-area-inset-bottom);
-  }
+    .legend-label {
+      white-space: nowrap;
+      line-height: 1.1;
+    }
 
-  /* レポート本文（整形HTML） */
-  .summary-body {
-    overflow: auto;
-    -webkit-overflow-scrolling: touch;
-    padding: 12px 16px 18px;
-    line-height: 1.75;
-    font-size: 15px;
-  }
+    /* =========================
+       Leafletコントロール（押しやすさ）
+       ========================= */
+    .leaflet-control-zoom {
+      border-radius: 999px;
+      overflow: hidden;
+      box-shadow: 0 8px 20px rgba(15, 23, 42, 0.35);
+    }
+    .leaflet-control-zoom a {
+      width: 32px;
+      height: 32px;
+      line-height: 30px;
+      font-size: 18px;
+    }
 
-  /* “縮小表示”のときは本文を隠して、プレビューだけ見せる */
-  .summary-preview {
-    display: none;
-    padding: 10px 16px 14px;
-    border-top: 1px solid rgba(226, 232, 240, 0.9);
-    color: #475569;
-    font-size: 13px;
-    line-height: 1.45;
-  }
+    /* =========================
+       AIレポート：サマリーパネル
+       ========================= */
+    .summary-panel-wrapper {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      pointer-events: none;
+      z-index: 1100;
+      padding: 0 6px calc(6px + env(safe-area-inset-bottom));
+    }
 
-  .summary-preview-hint {
-    margin-top: 6px;
-    font-size: 12px;
-    color: #64748b;
-  }
-
-  .summary-panel.peek .summary-body {
-    display: none;
-  }
-
-  .summary-panel.peek .summary-preview {
-    display: block;
-  }
-
-  /* 縮小状態：ヘッダーだけ残して下に退避（地図を広く） */
-  .summary-panel.visible.peek {
-    transform: translateY(calc(100% - 104px - env(safe-area-inset-bottom)));
-    opacity: 1;
-  }
-
-  /* レポート整形（見出し/箇条書き） */
-  .report h3 {
-    font-size: 15px;
-    margin: 12px 0 6px;
-    padding-top: 4px;
-  }
-
-  .report p {
-    margin: 6px 0;
-  }
-
-  .report ul {
-    margin: 6px 0 10px;
-    padding-left: 18px;
-  }
-
-  .report li {
-    margin: 4px 0;
-  }
-
-  .report .report-error {
-    color: #b91c1c;
-    background: rgba(254, 226, 226, 0.7);
-    border: 1px solid rgba(252, 165, 165, 0.9);
-    padding: 10px 12px;
-    border-radius: 10px;
-    line-height: 1.55;
-  }
-
-  /* スマホはタイトル周りも少し大きく */
-  @media (max-width: 640px) {
     .summary-panel {
-      width: calc(100% - 10px);
-      border-radius: 18px 18px 0 0;
+      margin: 0 auto;
+      max-width: 960px;
+      width: min(960px, calc(100% - 14px));
+      background: #ffffff;
+      border-radius: 16px 16px 0 0;
+      box-shadow: var(--kc-shadow-soft);
+      border-top: 1px solid rgba(226, 232, 240, 0.9);
+
+      display: flex;
+      flex-direction: column;
+
+      transform: translateY(100%);
+      opacity: 0;
+      transition: transform 0.26s cubic-bezier(0.16, 0.84, 0.44, 1), opacity 0.2s ease-out;
+      pointer-events: auto;
+
+      /* 画面上部（ナビ）を避ける */
+      max-height: min(74dvh, calc(100dvh - var(--kc-nav-height) - 12px));
+    }
+
+    .summary-panel.visible {
+      transform: translateY(0%);
+      opacity: 1;
+    }
+
+    .summary-handle {
+      width: 40px;
+      height: 4px;
+      border-radius: 999px;
+      background: rgba(148, 163, 184, 0.9);
+      margin: 8px auto 4px;
+      flex: 0 0 auto;
     }
 
     .summary-header {
-      padding: 12px 14px 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 16px 8px;
+      border-bottom: 1px solid #edf2ff;
+      flex: 0 0 auto;
+    }
+
+    .summary-header-main {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
     }
 
     .summary-title {
-      font-size: 15px;
+      font-size: clamp(13px, 1.2vw, 15px);
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .summary-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 6px;
+      border-radius: 999px;
+      font-size: 11px;
+      background: var(--kc-primary-soft);
+      color: var(--kc-primary);
+      flex: 0 0 auto;
     }
 
     .summary-subtitle {
-      font-size: 12px;
+      font-size: clamp(11px, 1vw, 13px);
+      color: var(--kc-text-sub);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .summary-close-btn {
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--kc-text-sub);
+      transition: background 0.12s ease-out, transform 0.12s ease-out;
+      flex: 0 0 auto;
+    }
+    .summary-close-btn:hover {
+      background: #f3f4ff;
+      transform: rotate(5deg);
     }
 
     .summary-body {
-      font-size: 15px;                /* スマホは読みやすく */
-      max-height: 68vh;               /* 画面をより使う */
-      padding: 12px 14px calc(18px + env(safe-area-inset-bottom));
-      line-height: 1.85;
+      padding: 12px 16px 18px;
+      overflow: auto;
+      -webkit-overflow-scrolling: touch;
+
+      font-size: clamp(13px, 1.15vw, 15px);
+      line-height: 1.75;
+      color: #374151;
+
+      overflow-wrap: anywhere;
+      word-break: break-word;
+
+      flex: 1 1 auto;
+      min-height: 0;
     }
-  }
+
+    .summary-body::-webkit-scrollbar { width: 6px; }
+    .summary-body::-webkit-scrollbar-thumb {
+      background: #cbd5f5;
+      border-radius: 999px;
+    }
+
+    .summary-loading {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--kc-text-sub);
+    }
+    .spinner {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      border: 2px solid #cbd5ff;
+      border-top-color: var(--kc-primary);
+      animation: spin 0.6s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(1turn); } }
+
+    /* ===== Leaflet popup内のAIボタン ===== */
+    .popup-ai-btn {
+      margin-top: 6px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      border: none;
+      background: var(--kc-primary-soft);
+      color: var(--kc-primary);
+      font-size: 11px;
+      cursor: pointer;
+      transition: background 0.12s ease-out, transform 0.12s ease-out, box-shadow 0.12s ease-out;
+    }
+    .popup-ai-btn:hover {
+      background: rgba(36, 107, 253, 0.18);
+      transform: translateY(-1px);
+      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.25);
+    }
+    .popup-ai-btn:active { transform: translateY(0); box-shadow: none; }
+
+    /* =========================
+       “縮小表示(PEEK)”のためのクラス（JSで付与される）
+       ========================= */
+    .summary-preview { display: none; padding: 10px 16px 14px; border-top: 1px solid rgba(226, 232, 240, 0.9); color: #475569; font-size: 13px; line-height: 1.45; }
+    .summary-preview-hint { margin-top: 6px; font-size: 12px; color: #64748b; }
+    .summary-panel.peek .summary-body { display: none; }
+    .summary-panel.peek .summary-preview { display: block; }
+
+    /* 縮小状態：ヘッダーだけ残して下に退避（地図を広く） */
+    .summary-panel.visible.peek {
+      transform: translateY(calc(100% - 104px - env(safe-area-inset-bottom)));
+      opacity: 1;
+    }
+
+    /* レポート整形（見出し/箇条書き） */
+    .report h3 { font-size: 15px; margin: 12px 0 6px; padding-top: 4px; }
+    .report p { margin: 6px 0; }
+    .report ul { margin: 6px 0 10px; padding-left: 18px; }
+    .report li { margin: 4px 0; }
+    .report .report-error {
+      color: #b91c1c;
+      background: rgba(254, 226, 226, 0.7);
+      border: 1px solid rgba(252, 165, 165, 0.9);
+      padding: 10px 12px;
+      border-radius: 10px;
+      line-height: 1.55;
+    }
+
+    /* =========================
+       スマホ最適化
+       ========================= */
+    @media (max-width: 768px) {
+      /* #map・パネルの押し下げ量をスマホ用に */
+      #map {
+        inset: var(--kc-nav-height-mobile) 0 0 0;
+        height: calc(100dvh - var(--kc-nav-height-mobile));
+      }
+
+      .kc-nav {
+        height: var(--kc-nav-height-mobile);
+        padding: 6px 10px;
+      }
+
+      .kc-nav-left { gap: 6px; }
+
+      .kc-nav-logo-dot { width: 22px; height: 22px; }
+
+      .kc-nav-title { font-size: 13px; }
+
+      /* 説明文はスマホでは非表示にしてナビをスッキリ */
+      .kc-nav-sub { display: none; }
+
+      /* 中央タブ：横スクロールで縦折れ防止 */
+      .kc-nav-center {
+        justify-content: flex-start;
+        gap: 6px;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+      }
+      .kc-nav-center::-webkit-scrollbar { display: none; }
+
+      .kc-nav-link {
+        flex: 0 0 auto;
+        min-width: 82px;
+        padding: 10px 10px;
+        font-size: 11px;
+      }
+
+      .kc-nav-cta {
+        padding: 6px 10px;
+        font-size: 11px;
+      }
+
+      /* 凡例：読みやすさだけ維持（“丸”化しない） */
+      .legend {
+        font-size: 10px;
+        padding: 8px 10px;
+        border-radius: 14px;
+        box-shadow: 0 8px 18px rgba(15, 23, 42, 0.25);
+      }
+      .legend-title { font-size: 10px; }
+
+      /* ボトムシート（AIレポート）はフル幅に近く */
+      .summary-panel {
+        width: calc(100% - 10px);
+        border-radius: 18px 18px 0 0;
+        max-height: min(80dvh, calc(100dvh - var(--kc-nav-height-mobile) - 12px));
+      }
+
+      .summary-header { padding: 12px 14px 8px; }
+      .summary-title { font-size: 15px; }
+      .summary-subtitle { font-size: 12px; }
+
+      .summary-body {
+        font-size: 15px;
+        line-height: 1.85;
+        padding: 12px 14px calc(18px + env(safe-area-inset-bottom));
+      }
+    }
+
+    /* アニメーション */
+    @keyframes kc-nav-breath {
+      0% { transform: scale(1); box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.22); }
+      50% { transform: scale(1.06); box-shadow: 0 0 0 8px rgba(37, 99, 235, 0.0); }
+      100% { transform: scale(1); box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.22); }
+    }
   </style>
 </head>
 <script>
@@ -969,6 +740,21 @@
 
     // 住民の声マーカー（再読み込み時にクリアできるように）
     const voiceLayer = L.layerGroup().addTo(map);
+
+    function lockMapScrollWhenReportOpen() {
+      const panel = document.querySelector(".summary-panel");
+      if (!panel || !window.L || !L.DomEvent) return;
+
+      L.DomEvent.disableScrollPropagation(panel);
+      L.DomEvent.disableClickPropagation(panel);
+
+      const body = panel.querySelector(".summary-body");
+      if (body) {
+        L.DomEvent.disableScrollPropagation(body);
+        L.DomEvent.disableClickPropagation(body);
+      }
+    }
+    lockMapScrollWhenReportOpen();
 
     // ----------------------------
     //  地区 → 代表座標
@@ -1357,15 +1143,14 @@
         const res = await fetch(`/admin/api/report/voice/${voiceId}`);
         if (!res.ok) {
           const t = await res.text();
-          summaryBody.textContent =
-            "レポート取得に失敗しました: " + res.status + " / " + t;
+          setErrorText("レポート取得に失敗しました: " + res.status + " / " + t);
           return;
         }
         const data = await res.json();
-        summaryBody.textContent = data.text ?? "レポートを取得できませんでした。";
+        setReportText(data.text ?? "レポートを取得できませんでした。");
       } catch (e) {
         console.error(e);
-        summaryBody.textContent = "レポート取得中にエラーが発生しました。";
+        setErrorText("レポート取得中にエラーが発生しました。");
       }
     }
 
